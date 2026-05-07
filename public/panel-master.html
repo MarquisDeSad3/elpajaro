@@ -616,6 +616,95 @@
       margin-top: 4px;
       text-align: right;
     }
+    /* ===== Round transition animation =====
+     * Overlay full-screen que aparece cuando avanza la ronda del bracket.
+     * Texto gigante con gold gradient, pop bounce + sparks orbitando + fade.
+     * Dura ~4.2s y se autodestruye. */
+    .round-transition {
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,.4) 0%, rgba(0,0,0,.92) 70%);
+      backdrop-filter: blur(24px) saturate(140%);
+      -webkit-backdrop-filter: blur(24px) saturate(140%);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999;
+      animation: rtFade 4.2s ease-out forwards;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .round-transition .rt-content {
+      position: relative;
+      text-align: center;
+      padding: 0 20px;
+    }
+    .round-transition .rt-text {
+      font-family: 'Bangers', cursive;
+      font-size: clamp(3.8rem, 13vw, 11rem);
+      background: var(--gold-grad);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 30px var(--gold-glow))
+              drop-shadow(0 4px 0 rgba(0,0,0,.6));
+      letter-spacing: 6px;
+      line-height: .95;
+      animation: rtPop 1.8s cubic-bezier(.34, 1.56, .64, 1) both;
+    }
+    .round-transition .rt-sub {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: clamp(.85rem, 1.4vw, 1.2rem);
+      letter-spacing: 5px;
+      color: var(--text);
+      margin-top: 18px;
+      text-transform: uppercase;
+      animation: rtSub 2.4s ease-out both;
+      animation-delay: .4s;
+    }
+    /* Sparks doradas orbitando alrededor del texto */
+    .round-transition .rt-spark {
+      position: absolute;
+      width: 14px; height: 14px;
+      background: radial-gradient(circle, #ffd84a 0%, transparent 70%);
+      border-radius: 50%;
+      filter: drop-shadow(0 0 12px var(--gold-glow));
+      animation: rtSparkFly 3s ease-out both;
+    }
+    @keyframes rtFade {
+      0%   { opacity: 0; }
+      8%   { opacity: 1; }
+      80%  { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    @keyframes rtPop {
+      0%   { opacity: 0; transform: scale(0.25) rotate(-8deg); filter: drop-shadow(0 0 0 transparent) blur(8px); }
+      40%  { opacity: 1; transform: scale(1.18) rotate(3deg);  filter: drop-shadow(0 0 40px var(--gold-glow)) blur(0); }
+      55%  { transform: scale(0.92) rotate(-1deg); }
+      70%  { transform: scale(1.05) rotate(1deg); }
+      100% { opacity: 1; transform: scale(1) rotate(0); }
+    }
+    @keyframes rtSub {
+      0%, 25% { opacity: 0; transform: translateY(20px); letter-spacing: 12px; }
+      55%     { opacity: 1; transform: translateY(0); letter-spacing: 5px; }
+      100%    { opacity: 1; }
+    }
+    @keyframes rtSparkFly {
+      0%   { opacity: 0; transform: translate(0,0) scale(0); }
+      15%  { opacity: 1; transform: translate(var(--dx), var(--dy)) scale(1); }
+      80%  { opacity: 1; }
+      100% { opacity: 0; transform: translate(calc(var(--dx) * 1.6), calc(var(--dy) * 1.6 - 80px)) scale(0); }
+    }
+
+    /* Variante CAMPEÓN con efecto extra: layers giratorios + más sparks */
+    .round-transition.champion {
+      background: radial-gradient(ellipse at center, rgba(255,209,74,.15) 0%, rgba(0,0,0,.95) 70%);
+    }
+    .round-transition.champion .rt-text {
+      animation: rtPop 1.8s cubic-bezier(.34, 1.56, .64, 1) both,
+                 rtChampShake 4s ease-in-out 1.8s infinite;
+    }
+    @keyframes rtChampShake {
+      0%, 100% { transform: rotate(0) scale(1); }
+      25% { transform: rotate(1deg) scale(1.02); }
+      75% { transform: rotate(-1deg) scale(1.02); }
+    }
   </style>
 </head>
 <body>

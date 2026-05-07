@@ -897,9 +897,127 @@
     });
   });
 
+  /* ===== Round transitions =====
+   * Animacion cinematica cuando cambia la ronda activa del bracket.
+   * Triggers detectados al comparar 2 broadcasts consecutivos del state:
+   *   - showStarted flip false→true     → "OCTOFINALES"
+   *   - activeRound avanza N → N+1      → nombre de la nueva ronda
+   *   - todas las rondas done           → "¡CAMPEÓN!" + nombre del ganador
+   *
+   * Por que comparar prev vs cur en lugar de trackear con un solo idx:
+   * si el panel se carga DURANTE el show, no queremos animar todas las
+   * rondas pasadas — solo las que sucedan a partir de este momento.
+   * Si _prevState es null (primer broadcast), no comparamos. */
+  let _prevServerState = null;
+
+  function activeRoundIdx(bracket) {
+    if (!bracket?.rounds) return -1;
+    for (let i = 0; i < bracket.rounds.length; i++) {
+      if (bracket.rounds[i].some(m => m.status !== 'done')) return i;
+    }
+    return -1; // todas done = campeón
+  }
+
+  const ROUND_TITLES = ['OCTOFINALES', 'CUARTOS DE FINAL', 'SEMIFINALES', '¡LA FINAL!'];
+  const ROUND_SUBS   = [
+    '8 MATCHES · 16 CANTANTES',
+    '4 MATCHES · 8 SOBREVIVEN',
+    '2 MATCHES · 4 GUERREROS',
+    'EL ÚLTIMO COMBATE',
+  ];
+
+  function detectRoundTransition() {
+    const cur  = serverState;
+    const prev = _prevServerState;
+    if (!cur) return;
+
+    // 1) Show recien arranco (flip false→true entre 2 broadcasts)
+    if (cur.showStarted && prev && !prev.showStarted) {
+      playRoundTransition(ROUND_TITLES[0], ROUND_SUBS[0]);
+    }
+
+    // 2) Cambio de ronda mientras show activo
+    if (cur.showStarted && prev?.showStarted && cur.bracket && prev.bracket) {
+      const curR  = activeRoundIdx(cur.bracket);
+      const prevR = activeRoundIdx(prev.bracket);
+
+      // Champion: todas las rondas done despues de no estarlo
+      if (curR === -1 && prevR !== -1) {
+        const champ = cur.contestants?.[cur.bracket.championId];
+        const name = champ?.name ? champ.name.toUpperCase() : '';
+        playRoundTransition('¡CAMPEÓN!', name, { variant: 'champion' });
+      }
+      // Avance de ronda: prev en N, ahora en N+1+
+      else if (curR > prevR && prevR >= 0 && curR < ROUND_TITLES.length) {
+        playRoundTransition(ROUND_TITLES[curR], ROUND_SUBS[curR]);
+      }
+    }
+
+    _prevServerState = cur;
+  }
+
+  function playRoundTransition(text, subtitle, opts = {}) {
+    playRoundFanfare();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'round-transition' + (opts.variant ? ' ' + opts.variant : '');
+
+    // 12 sparks que vuelan radialmente desde el centro
+    let sparks = '';
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const dist = 240 + Math.random() * 120;
+      const dx = Math.cos(angle) * dist;
+      const dy = Math.sin(angle) * dist;
+      const delay = Math.random() * 0.3;
+      sparks += `<div class="rt-spark" style="--dx:${dx}px;--dy:${dy}px;animation-delay:${delay}s;"></div>`;
+    }
+
+    overlay.innerHTML = `
+      <div class="rt-content">
+        ${sparks}
+        <div class="rt-text">${escapeHtml(text)}</div>
+        ${subtitle ? `<div class="rt-sub">${escapeHtml(subtitle)}</div>` : ''}
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    setTimeout(() => overlay.remove(), 4300);
+  }
+
+  /**
+   * Fanfare ascendente: 4 tonos C5→E5→G5→C6 con onda triangular (mas
+   * cinematico que la sine pura del LISTO sound). Reusa _audioCtx.
+   */
+  function playRoundFanfare() {
+    try {
+      _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = _audioCtx;
+      if (ctx.state === 'suspended') ctx.resume();
+      const tone = (freq, startOffset, dur, vol = 0.16) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+        const t0 = ctx.currentTime + startOffset;
+        gain.gain.setValueAtTime(0, t0);
+        gain.gain.linearRampToValueAtTime(vol, t0 + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+        osc.start(t0);
+        osc.stop(t0 + dur);
+      };
+      // Fanfare: C5, E5, G5, C6 stacked
+      tone(523.25, 0,    0.32);
+      tone(659.25, 0.16, 0.32);
+      tone(783.99, 0.32, 0.42);
+      tone(1046.50, 0.52, 0.85, 0.22);
+    } catch {}
+  }
+
   /* ===== Render ===== */
   function renderAll() {
     if (!serverState) return;
+    detectRoundTransition();      // antes de renderizar — usa state nuevo vs viejo
     renderTwitchWidgets();
     renderSlots('cuba');
     renderSlots('pr');
