@@ -8,8 +8,11 @@
  */
 
 const BASE = process.env.BASE || 'https://elpajaro.onrender.com';
-const PIN_CUBA = process.env.PIN_CUBA || '090809';
-const PIN_PR   = process.env.PIN_PR   || '872346';
+const PIN_CUBA = process.env.PIN_CUBA;
+if (!PIN_CUBA) {
+  console.error('Falta env var PIN_CUBA.');
+  process.exit(1);
+}
 
 // IDs de videos REALES de YouTube (verificados que existen) — random mix de
 // musica latina/popular para que cuando el user abra un modal, el clip

@@ -10,8 +10,12 @@
  */
 
 const BASE = process.env.BASE || 'https://elpajaro.onrender.com';
-const PIN_CUBA = process.env.PIN_CUBA || '090809';
-const PIN_PR   = process.env.PIN_PR   || '872346';
+const PIN_CUBA = process.env.PIN_CUBA;
+const PIN_PR   = process.env.PIN_PR;
+if (!PIN_CUBA || !PIN_PR) {
+  console.error('Faltan env vars PIN_CUBA y PIN_PR. Ejemplo:\n  PIN_CUBA=xxx PIN_PR=yyy node test-populate-both.js');
+  process.exit(1);
+}
 
 // ===== CUBA (reparto / urbano cubano) — 20 artistas, links verificados =====
 const CUBANOS = [
