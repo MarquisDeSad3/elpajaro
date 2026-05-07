@@ -422,6 +422,38 @@
       width: min(640px, 94vw);
       max-height: 90vh;
       overflow: auto;
+      position: relative;
+    }
+    /* Floating names cuando alguien vota — aparecen sobre el modal */
+    .vote-rain {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      border-radius: var(--radius-xl);
+      z-index: 5;
+    }
+    .vote-rain .name {
+      position: absolute;
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .78rem; letter-spacing: .8px;
+      padding: 4px 11px;
+      border-radius: 100px;
+      background: var(--ink);
+      color: var(--text);
+      opacity: 0;
+      animation: floatUp 2.4s ease-out forwards;
+      white-space: nowrap;
+      border: 1px solid rgba(255, 255, 255, .25);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, .55);
+    }
+    .vote-rain .name.cuba { background: var(--cuba-grad); border-color: rgba(108, 193, 255, .6); }
+    .vote-rain .name.pr   { background: var(--pr-grad);   border-color: rgba(255, 124, 141, .6); }
+    .vote-rain .name.cuba, .vote-rain .name.pr { color: white; }
+    @keyframes floatUp {
+      0%   { opacity: 0; transform: translateY(0) scale(.7); }
+      18%  { opacity: 1; transform: translateY(-18px) scale(1); }
+      100% { opacity: 0; transform: translateY(-160px) scale(.88); }
     }
     .p1-modal-inner h3 {
       font-family: 'Bangers', cursive;
@@ -786,6 +818,9 @@
     </div>
 
     <button id="modal-close" class="btn btn-ghost p1-modal-close">Cerrar sin decidir</button>
+
+    <!-- Lluvia de nombres flotantes cuando vota el chat -->
+    <div class="vote-rain" id="modal-vote-rain"></div>
   </div>
 </div>
 

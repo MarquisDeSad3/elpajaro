@@ -74,6 +74,10 @@
         pollState = m.poll;
         if (m.type === 'voting-start') pollState._tick = Date.now();
         renderModalPoll();
+        // Floating name del ultimo voto recibido (solo si el modal esta abierto)
+        if (m.type === 'voting-update' && m.lastVote && openModalCardId && m.poll?.targetId === openModalCardId) {
+          addFloatingVote(m.lastVote);
+        }
       }
     };
   }
@@ -486,6 +490,9 @@
     // Vaciar el iframe corta el video/audio para no seguir sonando.
     const embedWrap = $('modal-embed');
     if (embedWrap) embedWrap.innerHTML = '';
+    // Limpiar floating names del rain por si quedan algunos
+    const rain = $('modal-vote-rain');
+    if (rain) rain.innerHTML = '';
     $('p1-modal').classList.add('hidden');
     if (modalTimerInterval) { clearInterval(modalTimerInterval); modalTimerInterval = null; }
   }
@@ -604,6 +611,29 @@
     return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
   function escapeAttr(s) { return escapeHtml(s); }
+
+  /**
+   * Agrega un span flotante en el modal con el username que voto.
+   * Se posiciona segun el lado del voto (si/left → izq, no/right → der)
+   * con jitter random para variedad. Auto-remove despues de 2.5s.
+   */
+  function addFloatingVote(vote) {
+    if (!vote) return;
+    const rain = document.getElementById('modal-vote-rain');
+    if (!rain) return;
+    const el = document.createElement('span');
+    el.className = 'name ' + (vote.origin || '');
+    el.textContent = vote.user;
+    // Lado del modal segun el voto: si/left a la izquierda, no/right a la derecha
+    const isLeft = vote.side === 'si' || vote.side === 'left';
+    const xBase = isLeft ? 8 : 60;          // % desde left
+    const xJitter = Math.random() * 24;     // 0-24%
+    const yJitter = Math.random() * 30;     // 0-30%
+    el.style.left = (xBase + xJitter) + '%';
+    el.style.bottom = (8 + yJitter) + '%';
+    rain.appendChild(el);
+    setTimeout(() => el.remove(), 2500);
+  }
 
   // Icono por plataforma cuando no tenemos miniatura disponible
   function platformIconFor(platform) {
