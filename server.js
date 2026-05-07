@@ -553,6 +553,11 @@ app.get('/enviar', noStore, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'e
 app.get('/panel/cuba', noStore, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'panel-country.html')));
 app.get('/panel/pr', noStore, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'panel-country.html')));
 app.get('/panel/master', noStore, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'panel-master.html')));
+// Versiones role-locked del master: /panel/master/cuba acepta solo PIN_CUBA
+// y solo permite tocar el ESTOY LISTO de Cuba. Idem /panel/master/pr con PR.
+// El JS detecta el path y enforza el rol.
+app.get('/panel/master/cuba', noStore, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'panel-master.html')));
+app.get('/panel/master/pr',   noStore, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'panel-master.html')));
 app.get('/show', noStore, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'show.html')));
 
 app.use(express.static(PUBLIC_DIR));

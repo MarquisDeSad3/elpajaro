@@ -18,12 +18,30 @@
 (() => {
   'use strict';
 
-  const TOKEN_KEY = 'elpajaro.token.master';
+  // Detectar role-lock por URL: /panel/master/cuba → solo PIN_CUBA / role=cuba
+  //                            /panel/master/pr   → solo PIN_PR   / role=pr
+  //                            /panel/master      → cualquier PIN (backward-compat)
+  const targetRole = location.pathname.endsWith('/cuba') ? 'cuba'
+                   : location.pathname.endsWith('/pr')   ? 'pr'
+                   : null;
+
+  const TOKEN_KEY = 'elpajaro.token.master.' + (targetRole || 'shared');
   const PIN_KEY = TOKEN_KEY + '.pin';
   let token = localStorage.getItem(TOKEN_KEY) || null;
   let savedPin = localStorage.getItem(PIN_KEY) || null;
   let session = null;       // { role: 'cuba'|'pr'|'master' }
   let serverState = null;
+
+  // Customizar la pantalla de login segun el targetRole
+  if (targetRole) {
+    document.title = `Master ${targetRole.toUpperCase()} · El Pajaro`;
+    const loginH2 = document.querySelector('#login-screen h2');
+    const loginP  = document.querySelector('#login-screen p');
+    if (loginH2) loginH2.textContent = targetRole === 'cuba' ? 'MASTER · CUBA' : 'MASTER · PR';
+    if (loginP)  loginP.textContent  = targetRole === 'cuba'
+      ? 'Solo Kristoff (PIN de Cuba). Tu boton ESTOY LISTO va a estar activo.'
+      : 'Solo el streamer PR (PIN de PR). Tu boton ESTOY LISTO va a estar activo.';
+  }
 
   const $ = (id) => document.getElementById(id);
 
@@ -66,9 +84,11 @@
    * probamos con 'pr'. Ese intento doble es el costo de tener un solo
    * input de PIN para una pantalla compartida.
    */
-  // El master prueba los 3 roles para encontrar cual le corresponde al PIN
+  // Login: si targetRole esta seteado por URL, intenta solo ese rol.
+  // Si no (ruta /panel/master generica), prueba los 3 en orden.
   async function doLogin(pin) {
-    for (const tryRole of ['cuba', 'pr', 'master']) {
+    const rolesToTry = targetRole ? [targetRole] : ['cuba', 'pr', 'master'];
+    for (const tryRole of rolesToTry) {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -85,7 +105,9 @@
         return data;
       }
     }
-    throw new Error('PIN incorrecto.');
+    throw new Error(targetRole
+      ? `Ese PIN no es del lado ${targetRole.toUpperCase()}. Esta URL solo acepta PIN ${targetRole === 'cuba' ? 'de Cuba' : 'de PR'}.`
+      : 'PIN incorrecto.');
   }
 
   $('login-form').addEventListener('submit', async (e) => {
@@ -93,6 +115,7 @@
     $('login-error').textContent = '';
     try {
       await doLogin($('pin').value);
+      if (session) setRoleTag(session.role);
       showMain();
     } catch (e) { $('login-error').textContent = e.message; }
   });
@@ -112,19 +135,27 @@
   function showLogin() { $('login-screen').classList.remove('hidden'); $('main-panel').classList.add('hidden'); }
   function showMain()  { $('login-screen').classList.add('hidden'); $('main-panel').classList.remove('hidden'); renderAll(); }
 
+  function setRoleTag(role) {
+    const tag = document.querySelector('.role-tag');
+    if (!tag) return;
+    tag.textContent = role.toUpperCase();
+    tag.classList.remove('role-cuba', 'role-pr', 'role-master');
+    tag.classList.add('role-' + role);
+  }
+
   async function tryResume() {
     // 1) Token guardado: intentar validar
     if (token) {
       try {
         const r = await api('/api/admin/validate', {});
+        // Si la URL es role-locked y el token es de otro rol, descartar
+        if (targetRole && r.role !== targetRole) {
+          logout(false);
+          return;
+        }
         session = { role: r.role };
         serverState = r.state;
-        const tag = document.querySelector('.role-tag');
-        if (tag) {
-          tag.textContent = r.role.toUpperCase();
-          tag.classList.remove('role-cuba', 'role-pr', 'role-master');
-          tag.classList.add('role-' + r.role);
-        }
+        setRoleTag(r.role);
         showMain();
         return;
       } catch { /* token invalido — caer al PIN */ }
@@ -133,12 +164,7 @@
     if (savedPin) {
       try {
         await doLogin(savedPin);
-        const tag = document.querySelector('.role-tag');
-        if (tag && session) {
-          tag.textContent = session.role.toUpperCase();
-          tag.classList.remove('role-cuba', 'role-pr', 'role-master');
-          tag.classList.add('role-' + session.role);
-        }
+        if (session) setRoleTag(session.role);
         showMain();
         return;
       } catch {
