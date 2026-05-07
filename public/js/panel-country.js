@@ -33,7 +33,14 @@
   roleTag.classList.toggle('role-cuba', role === 'cuba');
   roleTag.classList.toggle('role-pr', role === 'pr');
 
+  // Guardamos token Y pin. Asi cuando Render reinicia (los tokens viven
+  // en memoria y se pierden), podemos re-autenticar automaticamente con
+  // el PIN guardado sin pedirle al user que tipee de nuevo. Trade-off:
+  // el PIN en localStorage es legible por extensiones del browser. Para
+  // un sistema interno entre 2 streamers compartiendo PIN, aceptable.
+  const PIN_KEY = TOKEN_KEY + '.pin';
   let token = localStorage.getItem(TOKEN_KEY) || null;
+  let savedPin = localStorage.getItem(PIN_KEY) || null;
   let serverState = null;
   let pollState = null;
   let countryItems = [];     // submissions del pais
@@ -91,45 +98,76 @@
   }
 
   /* ===== Login ===== */
+  async function doLogin(pin, isAuto = false) {
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin, role }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'PIN incorrecto');
+    token = data.token;
+    savedPin = pin;
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(PIN_KEY, pin);
+    serverState = data.state;
+    return data;
+  }
+
   $('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const pin = $('pin').value;
     try {
-      const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin, role }),
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || 'PIN incorrecto');
-      token = data.token;
-      localStorage.setItem(TOKEN_KEY, token);
-      serverState = data.state;
+      await doLogin(pin);
       showMain();
       await refreshList();
     } catch (e) { $('login-error').textContent = e.message; }
   });
 
-  function logout(silent = false) {
-    if (!silent) api('/api/admin/logout', {}).catch(() => {});
+  // Logout: si fue manual ("Salir"), limpia tambien el PIN guardado para
+  // que la proxima vez tipee. Si fue automatico (sesion vencida), conserva
+  // el PIN para que el resume lo reuse.
+  function logout(silentAndKeepPin = false) {
+    if (!silentAndKeepPin) {
+      api('/api/admin/logout', {}).catch(() => {});
+      localStorage.removeItem(PIN_KEY);
+      savedPin = null;
+    }
     localStorage.removeItem(TOKEN_KEY);
     token = null;
     showLogin();
   }
-  $('btn-logout').addEventListener('click', () => logout());
+  $('btn-logout').addEventListener('click', () => logout(false));
 
   function showLogin() { $('login-screen').classList.remove('hidden'); $('main-panel').classList.add('hidden'); }
   function showMain()  { $('login-screen').classList.add('hidden'); $('main-panel').classList.remove('hidden'); renderAll(); }
 
   async function tryResume() {
-    if (!token) { showLogin(); return; }
-    try {
-      const r = await api('/api/admin/validate', {});
-      if (r.role !== role) { logout(true); return; }
-      serverState = r.state;
-      showMain();
-      await refreshList();
-    } catch { showLogin(); }
+    // 1) Si tenemos token, intentar validar
+    if (token) {
+      try {
+        const r = await api('/api/admin/validate', {});
+        if (r.role !== role) { logout(false); return; }
+        serverState = r.state;
+        showMain();
+        await refreshList();
+        return;
+      } catch { /* token invalido — caer al re-login con PIN guardado */ }
+    }
+    // 2) Si tenemos PIN guardado, re-loguear automatico (sin pedirle al user)
+    if (savedPin) {
+      try {
+        await doLogin(savedPin, true);
+        showMain();
+        await refreshList();
+        return;
+      } catch { /* PIN guardado fallo — limpiarlo y mostrar login */
+        localStorage.removeItem(PIN_KEY);
+        savedPin = null;
+      }
+    }
+    // 3) Sin token ni PIN — mostrar login
+    showLogin();
   }
 
   /* ===== Screen routing ===== */

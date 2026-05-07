@@ -19,7 +19,9 @@
   'use strict';
 
   const TOKEN_KEY = 'elpajaro.token.master';
+  const PIN_KEY = TOKEN_KEY + '.pin';
   let token = localStorage.getItem(TOKEN_KEY) || null;
+  let savedPin = localStorage.getItem(PIN_KEY) || null;
   let session = null;       // { role: 'cuba'|'pr'|'master' }
   let serverState = null;
 
@@ -64,57 +66,88 @@
    * probamos con 'pr'. Ese intento doble es el costo de tener un solo
    * input de PIN para una pantalla compartida.
    */
+  // El master prueba los 3 roles para encontrar cual le corresponde al PIN
+  async function doLogin(pin) {
+    for (const tryRole of ['cuba', 'pr', 'master']) {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin, role: tryRole }),
+      });
+      const data = await res.json();
+      if (data.ok && data.token) {
+        token = data.token;
+        session = { role: data.role };
+        savedPin = pin;
+        localStorage.setItem(TOKEN_KEY, token);
+        localStorage.setItem(PIN_KEY, pin);
+        serverState = data.state;
+        return data;
+      }
+    }
+    throw new Error('PIN incorrecto.');
+  }
+
   $('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const pin = $('pin').value;
     $('login-error').textContent = '';
-    for (const tryRole of ['cuba', 'pr', 'master']) {
-      try {
-        const res = await fetch('/api/admin/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pin, role: tryRole }),
-        });
-        const data = await res.json();
-        if (data.ok && data.token) {
-          token = data.token;
-          session = { role: data.role };
-          localStorage.setItem(TOKEN_KEY, token);
-          serverState = data.state;
-          showMain();
-          return;
-        }
-      } catch {}
-    }
-    $('login-error').textContent = 'PIN incorrecto.';
+    try {
+      await doLogin($('pin').value);
+      showMain();
+    } catch (e) { $('login-error').textContent = e.message; }
   });
 
-  function logout(silent = false) {
-    if (!silent) api('/api/admin/logout', {}).catch(() => {});
+  function logout(silentAndKeepPin = false) {
+    if (!silentAndKeepPin) {
+      api('/api/admin/logout', {}).catch(() => {});
+      localStorage.removeItem(PIN_KEY);
+      savedPin = null;
+    }
     localStorage.removeItem(TOKEN_KEY);
     token = null; session = null;
     showLogin();
   }
-  $('btn-logout').addEventListener('click', () => logout());
+  $('btn-logout').addEventListener('click', () => logout(false));
 
   function showLogin() { $('login-screen').classList.remove('hidden'); $('main-panel').classList.add('hidden'); }
   function showMain()  { $('login-screen').classList.add('hidden'); $('main-panel').classList.remove('hidden'); renderAll(); }
 
   async function tryResume() {
-    if (!token) { showLogin(); return; }
-    try {
-      const r = await api('/api/admin/validate', {});
-      session = { role: r.role };
-      serverState = r.state;
-      // Update role tag color based on session role
-      const tag = document.querySelector('.role-tag');
-      if (tag) {
-        tag.textContent = r.role.toUpperCase();
-        tag.classList.remove('role-cuba', 'role-pr', 'role-master');
-        tag.classList.add('role-' + r.role);
+    // 1) Token guardado: intentar validar
+    if (token) {
+      try {
+        const r = await api('/api/admin/validate', {});
+        session = { role: r.role };
+        serverState = r.state;
+        const tag = document.querySelector('.role-tag');
+        if (tag) {
+          tag.textContent = r.role.toUpperCase();
+          tag.classList.remove('role-cuba', 'role-pr', 'role-master');
+          tag.classList.add('role-' + r.role);
+        }
+        showMain();
+        return;
+      } catch { /* token invalido — caer al PIN */ }
+    }
+    // 2) PIN guardado: re-login automatico
+    if (savedPin) {
+      try {
+        await doLogin(savedPin);
+        const tag = document.querySelector('.role-tag');
+        if (tag && session) {
+          tag.textContent = session.role.toUpperCase();
+          tag.classList.remove('role-cuba', 'role-pr', 'role-master');
+          tag.classList.add('role-' + session.role);
+        }
+        showMain();
+        return;
+      } catch {
+        localStorage.removeItem(PIN_KEY);
+        savedPin = null;
       }
-      showMain();
-    } catch { showLogin(); }
+    }
+    // 3) Sin nada — login
+    showLogin();
   }
 
   /* ===== Render slots ===== */
