@@ -378,15 +378,50 @@
     openModalCardId = id;
     $('modal-name').textContent = s.name;
     $('modal-ig').textContent = s.instagram ? '@' + s.instagram : '(sin IG)';
-    $('modal-mediatype').textContent = s.mediaType;
+    $('modal-mediatype').textContent = s.mediaType || s.clipKind || 'media';
     $('modal-link').href = s.mediaUrl;
     $('modal-link').textContent = s.mediaUrl;
+
+    // === Embed del clip ===
+    // Renderizamos iframe (YouTube/Vimeo/TikTok/etc), <video> (mp4),
+    // <audio> (mp3) o un link de fallback segun s.clipKind. Si la submission
+    // es vieja y no tiene clipKind, intentamos detectar por mediaType.
+    const embedWrap = $('modal-embed');
+    embedWrap.innerHTML = '';
+    const kind = s.clipKind || (s.mediaType === 'video' ? 'iframe' : s.mediaType === 'audio' ? 'audio' : 'link');
+    if (kind === 'iframe') {
+      const iframe = document.createElement('iframe');
+      iframe.src = s.clipEmbed || s.mediaUrl;
+      iframe.allow = 'autoplay; encrypted-media; picture-in-picture; clipboard-write';
+      iframe.allowFullscreen = true;
+      iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+      embedWrap.appendChild(iframe);
+    } else if (kind === 'video') {
+      const v = document.createElement('video');
+      v.src = s.mediaUrl; v.controls = true; v.preload = 'metadata';
+      embedWrap.appendChild(v);
+    } else if (kind === 'audio') {
+      const a = document.createElement('audio');
+      a.src = s.mediaUrl; a.controls = true; a.preload = 'metadata';
+      embedWrap.appendChild(a);
+    } else {
+      // 'link' — boton clickeable hacia la URL original
+      const a = document.createElement('a');
+      a.href = s.mediaUrl; a.target = '_blank'; a.rel = 'noopener';
+      a.className = 'link-fallback';
+      a.textContent = '🔗 Abrir en otra pestaña (no se puede embeber)';
+      embedWrap.appendChild(a);
+    }
+
     $('p1-modal').classList.remove('hidden');
     pollState = null;
     renderModalPoll();
   }
   function closeP1Modal() {
     openModalCardId = null;
+    // Vaciar el iframe corta el video/audio para no seguir sonando.
+    const embedWrap = $('modal-embed');
+    if (embedWrap) embedWrap.innerHTML = '';
     $('p1-modal').classList.add('hidden');
     if (modalTimerInterval) { clearInterval(modalTimerInterval); modalTimerInterval = null; }
   }

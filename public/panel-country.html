@@ -308,10 +308,49 @@
       display: block;
       background: white; border: 1px solid rgba(26,18,48,.15); border-radius: var(--radius);
       padding: 10px 14px;
-      font-family: monospace; font-size: .78rem;
+      font-family: monospace; font-size: .72rem;
       color: var(--cuba-700); text-decoration: none;
       word-break: break-all;
-      margin-bottom: 18px;
+      margin-bottom: 14px;
+      opacity: .7;
+    }
+    /* Embed container — el preview del video/audio dentro del modal */
+    .p1-modal-embed {
+      width: 100%;
+      margin-bottom: 14px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 2px solid rgba(26,18,48,.18);
+      background: #000;
+      box-shadow: 0 6px 18px rgba(0,0,0,.25);
+    }
+    .p1-modal-embed iframe {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      display: block;
+      border: 0;
+    }
+    .p1-modal-embed video {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      display: block;
+      background: #000;
+    }
+    .p1-modal-embed audio {
+      width: 100%;
+      display: block;
+      padding: 10px;
+      background: #1a1230;
+    }
+    .p1-modal-embed .link-fallback {
+      padding: 30px 16px;
+      text-align: center;
+      color: var(--gold);
+      font-family: 'Archivo Black', sans-serif;
+      letter-spacing: 1px;
+      background: #1a1230;
+      text-decoration: none;
+      display: block;
     }
     .p1-poll-controls {
       display: flex; gap: 8px; align-items: center; margin-bottom: 14px;
@@ -588,7 +627,12 @@
   <div class="p1-modal-inner">
     <h3 id="modal-name">—</h3>
     <div class="p1-modal-meta"><span id="modal-ig"></span> · <span id="modal-mediatype"></span></div>
-    <a id="modal-link" class="p1-modal-link" target="_blank" rel="noopener">—</a>
+
+    <!-- Embed del video/audio: aca se reproduce inline para que el host
+         (y los viewers de su stream) vean el clip durante la votacion. -->
+    <div id="modal-embed" class="p1-modal-embed"></div>
+
+    <a id="modal-link" class="p1-modal-link" target="_blank" rel="noopener" title="Abrir en otra pestana">—</a>
 
     <div class="p1-poll-controls">
       <label class="font-strong" style="font-size:.78rem; letter-spacing:1px;">Voto (s):</label>
