@@ -82,16 +82,15 @@ voting.init({
   stateModule: stateMod,
   onTimeoutFn: (targetId, mode) => {
     if (mode === 'duel') {
-      // Si era el duel del bracket, dejamos el match en fase 'result' para
-      // que el host decida (consenso 2-de-2). NO auto-decidimos por mayoria.
+      // Modo nuevo: auto-decide por mayoria del chat al expirar el timer.
+      // (autoDecideByChat es function declaration → hoisted, accesible aca)
       const cur = stateMod.state.currentMatch;
       if (cur && cur.matchId === targetId && cur.phase === 'voting') {
-        stateMod.setCurrentMatch(targetId, 'result');
+        autoDecideByChat(targetId);
       }
     } else if (mode === 'binary') {
       // Eliminacion fase 1 — al expirar el poll, dejamos la card abierta
-      // para que el admin del pais pulse PASA o NO PASA. No auto-decidimos.
-      // (Active phase1 card sigue tal cual, voting solo se cerro)
+      // para que el admin del pais pulse PASA o NO PASA.
     }
   },
 });
@@ -534,6 +533,88 @@ app.post('/api/match/cancel-decision', (req, res) => {
   stateMod.clearPendingDecision();
   res.json({ ok: true });
 });
+
+/* ============================================================
+ * NUEVO FLOW: confirmacion de fase + auto-decide por chat majority
+ * ============================================================
+ *
+ * POST /api/match/confirm { matchId, phase }
+ *   - Auth: cuba o pr
+ *   - Registra que ese rol esta listo para avanzar de la fase actual.
+ *   - Cuando AMBOS estan listos, avanza:
+ *       idle    + 2 ready → preview (video reproduce)
+ *       preview + 2 ready → voting (chat puede votar)
+ *       voting  + 2 ready (o timeout) → result (decide por mayoria del chat)
+ */
+app.post('/api/match/confirm', (req, res) => {
+  const session = hostAuth.requireRole(req, res, null);
+  if (!session) return;
+  if (session.role !== 'cuba' && session.role !== 'pr') {
+    return res.status(403).json({ ok: false, error: 'Solo cuba y pr confirman.' });
+  }
+  const matchId = String(req.body?.matchId || '');
+  const phase = String(req.body?.phase || 'idle');
+  if (!['idle', 'preview', 'voting'].includes(phase)) {
+    return res.status(400).json({ ok: false, error: 'Fase invalida.' });
+  }
+  const m = stateMod.findMatch(matchId);
+  if (!m) return res.status(400).json({ ok: false, error: 'Match no encontrado.' });
+  if (m.status === 'done') return res.status(400).json({ ok: false, error: 'Match ya cerrado.' });
+  if (!m.leftId || !m.rightId) {
+    return res.status(400).json({ ok: false, error: 'El match no tiene ambos contestantes.' });
+  }
+
+  const r = stateMod.setMatchConfirmation(matchId, phase, session.role);
+  if (!r) return res.status(400).json({ ok: false, error: 'No se pudo registrar.' });
+
+  if (r.bothReady) {
+    // Avanzar de fase
+    if (phase === 'idle') {
+      // → preview
+      voting.endNow();
+      stateMod.setCurrentMatch(matchId, 'preview');
+      stateMod.clearMatchConfirmations();
+      // Auto-broadcast play de los 2 clips a la vez
+      wsBus.broadcast({ type: 'clip-control', side: 'left',  action: 'play', ts: Date.now() });
+      wsBus.broadcast({ type: 'clip-control', side: 'right', action: 'play', ts: Date.now() });
+    } else if (phase === 'preview') {
+      // → voting (chat puede votar)
+      stateMod.setCurrentMatch(matchId, 'voting', DEFAULT_VOTE_MS);
+      voting.start({ mode: 'duel', targetId: matchId, durationMs: DEFAULT_VOTE_MS });
+      stateMod.clearMatchConfirmations();
+    } else if (phase === 'voting') {
+      // → result (cierra votacion antes de tiempo y decide por mayoria)
+      autoDecideByChat(matchId);
+      stateMod.clearMatchConfirmations();
+    }
+  }
+  res.json({ ok: true, ...r });
+});
+
+/**
+ * Cierra la votacion del match y elige al ganador por mayoria del chat.
+ * En empate, gana left (arbitrario, marcado en logs).
+ */
+function autoDecideByChat(matchId) {
+  const poll = voting.getActive() || {};
+  const totals = poll.totals || { leftTotal: 0, rightTotal: 0 };
+  voting.endNow();
+  let winnerSide = 'left';
+  if (totals.rightTotal > totals.leftTotal) winnerSide = 'right';
+  if (totals.leftTotal === totals.rightTotal) {
+    console.log('[MATCH]', matchId, 'tie', totals, '→ left wins by default');
+  }
+  const out = bracketMod.decideMatch(stateMod.state.bracket, matchId, winnerSide);
+  if (!out.ok) {
+    console.error('[MATCH] decideMatch failed:', out.error);
+    return;
+  }
+  stateMod.recordHistory({
+    matchId, winnerId: out.match.winnerId, decidedAt: out.match.decidedAt,
+    autoDecidedByChat: true, votes: totals,
+  });
+  stateMod.setCurrentMatch(null);
+}
 
 /* ===== Compatibilidad: /host -> /panel/master ===== */
 app.get('/host', (_req, res) => res.redirect(301, '/panel/master'));

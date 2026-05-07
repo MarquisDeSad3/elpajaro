@@ -390,12 +390,195 @@
     } catch (e) { toast(e.message); }
   }
 
-  /* ===== Show running ===== */
+  /* ===== Show running — bracket UI =====
+   * Reemplaza el placeholder "EL SHOW EN VIVO" por la UI real del bracket:
+   * - Active match box: el match en juego ahora con miniaturas + LISTO button
+   * - Match list: todos los matches del bracket organizados por ronda
+   *
+   * Flujo del LISTO button (solo en role-locked views /cuba y /pr):
+   *   Match en idle    → LISTO 1 → ambos confirman → preview (videos suenan)
+   *   Match en preview → LISTO 2 → ambos confirman → voting (chat vota)
+   *   Match en voting  → LISTO 3 → ambos confirman → cierra y decide por mayoria
+   *                       O alternativamente espera el timeout del timer.
+   *
+   * En vista publica /panel/master: solo se ve, no se interactua.
+   */
   function renderShowRunning() {
     const running = !!serverState?.showStarted;
     $('stage-pre-show').classList.toggle('hidden', running);
     $('stage-show-running').classList.toggle('hidden', !running);
+    if (!running) return;
+    renderActiveMatch();
+    renderBracketList();
   }
+
+  function findNextPendingMatch() {
+    if (!serverState?.bracket) return null;
+    for (const round of serverState.bracket.rounds) {
+      for (const m of round) {
+        if (m.status !== 'done' && m.leftId && m.rightId) return m;
+      }
+    }
+    return null;
+  }
+
+  function renderActiveMatch() {
+    const cur = serverState?.currentMatch;
+    let match, phase;
+    if (cur) {
+      match = findMatchById(cur.matchId);
+      phase = cur.phase;
+    } else {
+      match = findNextPendingMatch();
+      phase = 'idle';
+    }
+    if (!match) {
+      $('active-match-box').style.display = 'none';
+      return;
+    }
+    $('active-match-box').style.display = '';
+    const cs = serverState.contestants || {};
+    const a = cs[match.leftId];
+    const b = cs[match.rightId];
+
+    // Phase tag
+    const tagText = phase === 'idle'    ? 'PRÓXIMO MATCH'
+                  : phase === 'preview' ? 'PREVIEW · ESCUCHANDO LOS 2 VIDEOS'
+                  : phase === 'voting'  ? 'VOTANDO · CHAT DECIDE'
+                  : phase === 'result'  ? 'GANADOR'
+                                        : 'IDLE';
+    $('active-phase-tag').textContent = tagText;
+
+    // Side info
+    fillSide('left',  a);
+    fillSide('right', b);
+
+    // LISTO button
+    const btn = $('match-listo');
+    const stepEl = $('match-listo-step');
+    const labelEl = $('match-listo-label');
+    const statusEl = $('match-listo-status');
+
+    if (isPublicView) {
+      btn.style.display = 'none';
+      statusEl.innerHTML = `Vista pública — los streamers entran a <a href="/panel/master/cuba" style="color:var(--cuba-300);">/master/cuba</a> y <a href="/panel/master/pr" style="color:var(--pr-300);">/master/pr</a>`;
+      return;
+    }
+    btn.style.display = '';
+    const myRole = session?.role;
+    const conf = serverState.matchConfirmations;
+    const matchesCurrent = conf && conf.matchId === match.id && conf.phase === phase;
+    const myConfirmed   = matchesCurrent && (myRole === 'cuba' ? conf.cubaConfirmed : conf.prConfirmed);
+    const otherConfirmed = matchesCurrent && (myRole === 'cuba' ? conf.prConfirmed : conf.cubaConfirmed);
+
+    // Texto del boton segun fase
+    const buttonByPhase = {
+      idle:    { step: 'PASO 1 DE 3', label: '▶ LISTO — ARRANCAR PREVIEW' },
+      preview: { step: 'PASO 2 DE 3', label: '▶ LISTO — ABRIR VOTACIÓN' },
+      voting:  { step: 'PASO 3 DE 3', label: '⏹ LISTO — CERRAR VOTACIÓN' },
+    };
+    const phaseUI = buttonByPhase[phase];
+    if (phaseUI) {
+      stepEl.textContent = phaseUI.step;
+      labelEl.textContent = myConfirmed ? '✓ TU LISTO YA CONFIRMADO' : phaseUI.label;
+    } else {
+      stepEl.textContent = '—';
+      labelEl.textContent = phase.toUpperCase();
+    }
+    btn.disabled = myConfirmed || phase === 'result';
+    btn.dataset.matchId = match.id;
+    btn.dataset.phase   = phase;
+
+    // Status del lado opuesto
+    const otherName = myRole === 'cuba' ? 'PR' : 'CUBA';
+    const cubaPill = myConfirmed && myRole === 'cuba' || (matchesCurrent && conf.cubaConfirmed);
+    const prPill   = myConfirmed && myRole === 'pr'   || (matchesCurrent && conf.prConfirmed);
+    statusEl.innerHTML = `
+      <div>
+        <span class="ready-pill ${cubaPill ? 'ok' : 'no'}">CUBA ${cubaPill ? '✓' : '○'}</span>
+        <span class="ready-pill ${prPill   ? 'ok' : 'no'}">PR ${prPill ? '✓' : '○'}</span>
+      </div>
+      ${myConfirmed && !otherConfirmed ? `<div style="margin-top:6px;">Esperando ${otherName}...</div>` : ''}
+    `;
+  }
+
+  function fillSide(side, c) {
+    const thumb = $(`active-${side}-thumb`);
+    if (c?.clipThumbnail) {
+      thumb.src = c.clipThumbnail;
+      thumb.style.display = '';
+    } else {
+      thumb.style.display = 'none';
+    }
+    $(`active-${side}-name`).textContent = c?.name || '?';
+    $(`active-${side}-ig`).textContent = c?.bio || (c?.instagram ? '@' + c.instagram : '');
+    const country = c?.country === 'cuba' ? 'CUBA' : c?.country === 'pr' ? 'PR' : '';
+    const countryEl = $(`active-${side}-country`);
+    countryEl.textContent = country;
+    countryEl.classList.remove('cuba', 'pr');
+    if (c?.country) countryEl.classList.add(c.country);
+  }
+
+  function renderBracketList() {
+    const root = $('bracket-list');
+    root.innerHTML = '';
+    if (!serverState?.bracket) return;
+    const cs = serverState.contestants || {};
+    const roundNames = ['OCTOFINALES', 'CUARTOS', 'SEMIFINALES', 'FINAL'];
+    serverState.bracket.rounds.forEach((round, ri) => {
+      const sec = document.createElement('div');
+      sec.className = 'match-round';
+      sec.innerHTML = `<h3>${roundNames[ri] || ('RONDA ' + (ri + 1))}</h3>`;
+      round.forEach((m, mi) => {
+        const a = cs[m.leftId];
+        const b = cs[m.rightId];
+        const aName = a?.name || (m.leftId ? '?' : 'TBD');
+        const bName = b?.name || (m.rightId ? '?' : 'TBD');
+        const isActive = m.status === 'active' || (serverState.currentMatch?.matchId === m.id);
+        const cls = ['match-row'];
+        if (isActive) cls.push('active');
+        if (m.status === 'done') cls.push('done');
+        const aCls = m.status === 'done' ? (m.winnerId === m.leftId ? 'winner' : 'loser') : '';
+        const bCls = m.status === 'done' ? (m.winnerId === m.rightId ? 'winner' : 'loser') : '';
+        const aCountryCls = a?.country === 'cuba' ? 'cuba' : a?.country === 'pr' ? 'pr' : '';
+        const bCountryCls = b?.country === 'cuba' ? 'cuba' : b?.country === 'pr' ? 'pr' : '';
+
+        const row = document.createElement('div');
+        row.className = cls.join(' ');
+        row.innerHTML = `
+          <span class="num">#${mi + 1}</span>
+          <span class="side ${aCountryCls} ${aCls}">${escapeHtml(aName)}</span>
+          <span class="vs">vs</span>
+          <span class="side ${bCountryCls} ${bCls}">${escapeHtml(bName)}</span>
+        `;
+        sec.appendChild(row);
+      });
+      root.appendChild(sec);
+    });
+  }
+
+  function findMatchById(id) {
+    if (!serverState?.bracket) return null;
+    for (const round of serverState.bracket.rounds) {
+      const m = round.find(x => x.id === id);
+      if (m) return m;
+    }
+    return null;
+  }
+
+  // Click handler del LISTO button
+  $('match-listo').addEventListener('click', async () => {
+    if (isPublicView) return;
+    const matchId = $('match-listo').dataset.matchId;
+    const phase   = $('match-listo').dataset.phase;
+    if (!matchId || !phase) return;
+    try {
+      await api('/api/match/confirm', { matchId, phase });
+      toast('LISTO ✓');
+    } catch (e) {
+      toast(e.message);
+    }
+  });
 
   /* ===== Render ===== */
   function renderAll() {
