@@ -21,53 +21,67 @@
 <!-- ==================== STAGE: pajaro + bracket ==================== -->
 <div id="stage" class="stage">
 
-  <!-- Pajaro SVG (silueta simplificada estilo comic) -->
+  <!-- Pajaro SVG: silueta heraldica de un solo trazo (cuerpo + alas + cola
+       en un mismo path para que lea como UNA criatura). Cabeza/ojo/pico/
+       corazon van encima como capas separadas. -->
   <svg id="bird" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-    <!-- Cuerpo central -->
-    <ellipse class="bird-fill" cx="800" cy="520" rx="58" ry="170" />
-    <!-- Cuello -->
-    <rect class="bird-fill" x="780" y="320" width="40" height="80" rx="14" />
-    <!-- Cabeza -->
-    <circle class="bird-fill" cx="800" cy="290" r="58" />
-    <!-- Pico -->
-    <polygon class="bird-beak" points="800,348 818,378 782,378" />
-    <!-- Ojo -->
-    <circle class="bird-eye" cx="800" cy="278" r="6" />
-    <!-- Ala izquierda — silueta curva tipo bandera -->
-    <path class="bird-wing wing-left"
-          d="M 760 410
-             Q 460 320, 220 380
-             Q 70 460, 60 530
-             Q 200 620, 380 620
-             Q 560 620, 760 600
-             Z" />
-    <!-- Ala derecha (mirror) -->
-    <path class="bird-wing wing-right"
-          d="M 840 410
-             Q 1140 320, 1380 380
-             Q 1530 460, 1540 530
-             Q 1400 620, 1220 620
-             Q 1040 620, 840 600
-             Z" />
-    <!-- Cola -->
-    <polygon class="bird-fill"
-             points="780,680 760,800 800,760 840,800 820,680" />
-    <!-- Plumas decorativas en alas (lineas) -->
+
+    <!-- 1) Silueta principal (alas + cuerpo + cola, todo un trazo) -->
+    <path class="bird-silhouette" d="
+      M 800 320
+      C 770 320, 740 340, 720 380
+      Q 600 250, 400 240
+      Q 180 240, 60 380
+      Q 100 460, 240 520
+      Q 380 570, 540 600
+      Q 660 620, 720 640
+      L 740 720
+      L 760 770
+      L 790 740
+      L 800 770
+      L 810 740
+      L 840 770
+      L 860 720
+      L 880 640
+      Q 940 620, 1060 600
+      Q 1220 570, 1360 520
+      Q 1500 460, 1540 380
+      Q 1420 240, 1200 240
+      Q 1000 250, 880 380
+      C 860 340, 830 320, 800 320
+      Z" />
+
+    <!-- 2) Plumas (lineas decorativas curvas, simetricas) -->
     <g class="feather-lines">
-      <path d="M 220 410 Q 380 480, 540 540" />
-      <path d="M 320 380 Q 460 460, 600 530" />
-      <path d="M 420 380 Q 540 460, 660 540" />
-      <path d="M 1380 410 Q 1220 480, 1060 540" />
-      <path d="M 1280 380 Q 1140 460, 1000 530" />
-      <path d="M 1180 380 Q 1060 460, 940 540" />
+      <path d="M 720 400 Q 540 380, 280 410" />
+      <path d="M 720 440 Q 520 440, 240 470" />
+      <path d="M 720 490 Q 540 510, 320 540" />
+      <path d="M 720 540 Q 580 565, 440 590" />
+      <path d="M 880 400 Q 1060 380, 1320 410" />
+      <path d="M 880 440 Q 1080 440, 1360 470" />
+      <path d="M 880 490 Q 1060 510, 1280 540" />
+      <path d="M 880 540 Q 1020 565, 1160 590" />
     </g>
-    <!-- Corazon en el pecho (objetivo final del bracket) -->
-    <g id="heart" class="heart">
-      <path d="M 800 580
-               L 770 555 A 18 18 0 1 1 800 540
-               A 18 18 0 1 1 830 555
-               Z" />
+
+    <!-- 3) Cabeza (encima del cuerpo) -->
+    <ellipse class="bird-head" cx="800" cy="240" rx="62" ry="70" />
+
+    <!-- 4) Pico (apunta hacia abajo desde la cabeza) -->
+    <path class="bird-beak" d="M 800 310 L 820 345 Q 800 360, 780 345 Z" />
+
+    <!-- 5) Ojos (uno solo, lado izq como vista 3/4) -->
+    <circle class="bird-eye" cx="785" cy="225" r="6" />
+    <circle class="bird-eye-shine" cx="787" cy="222" r="2" />
+
+    <!-- 7) Corazon en el pecho (donde queda el campeon) -->
+    <g id="heart" class="heart" transform="translate(800 460)">
+      <path d="M 0 18
+               C -25 -8, -38 -3, -38 -18
+               A 18 18 0 0 1 0 -22
+               A 18 18 0 0 1 38 -18
+               C 38 -3, 25 -8, 0 18 Z" />
     </g>
+
   </svg>
 
   <!-- Capa absoluta donde se monta el bracket. Las posiciones de cada match

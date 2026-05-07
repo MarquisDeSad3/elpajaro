@@ -11,36 +11,38 @@
   'use strict';
 
   // ============= Layout =============
-  // Cada match (id sera asignado al construir el bracket) tiene una posicion
-  // fija. Aca solo definimos la posicion por (round, slot).
-  // Coordenadas en % del viewport — top, left.
+  // Cada match tiene una posicion fija por (round, slot). Coordenadas en %
+  // del viewport. Calibradas para coincidir con la silueta del pajaro
+  // (alas que arrancan en ~13% y terminan en ~87%, alto util ~25-75%).
   const LAYOUT = {
-    // Round 0 — octofinales (8 matches): 4 sobre cada ala, hacia el borde exterior
+    // Round 0 — octofinales (8): 4 por ala. La curva del ala es mas gruesa
+    // en el medio que en los extremos, por eso slot 0 y 3 (top/bottom outer)
+    // van mas adentro que slot 1 y 2 (medio del ala).
     0: [
-      { top: 22, left:  9 },   // L0
-      { top: 38, left:  6 },   // L1
-      { top: 58, left:  6 },   // L2
-      { top: 74, left:  9 },   // L3
-      { top: 22, left: 91 },   // R0
-      { top: 38, left: 94 },   // R1
-      { top: 58, left: 94 },   // R2
-      { top: 74, left: 91 },   // R3
+      { top: 30, left: 17 },   // L slot 0 (top-outer)
+      { top: 43, left: 13 },   // L slot 1
+      { top: 56, left: 13 },   // L slot 2
+      { top: 69, left: 17 },   // L slot 3 (bottom-outer)
+      { top: 30, left: 83 },   // R slot 4 (mirror)
+      { top: 43, left: 87 },   // R slot 5
+      { top: 56, left: 87 },   // R slot 6
+      { top: 69, left: 83 },   // R slot 7
     ],
-    // Round 1 — cuartos (4): mas hacia el centro
+    // Round 1 — cuartos (4)
     1: [
-      { top: 30, left: 24 },   // L
-      { top: 66, left: 24 },   // L
-      { top: 30, left: 76 },   // R
-      { top: 66, left: 76 },   // R
+      { top: 36, left: 28 },   // L top
+      { top: 63, left: 28 },   // L bottom
+      { top: 36, left: 72 },   // R top
+      { top: 63, left: 72 },   // R bottom
     ],
-    // Round 2 — semis (2)
+    // Round 2 — semis (2): a los lados del corazon
     2: [
-      { top: 48, left: 36 },   // L (campeon ala izq)
-      { top: 48, left: 64 },   // R (campeon ala der)
+      { top: 50, left: 39 },   // L wing champion
+      { top: 50, left: 61 },   // R wing champion
     ],
-    // Round 3 — final
+    // Round 3 — final: justo abajo del corazon, sobre el cuerpo
     3: [
-      { top: 56, left: 50 },
+      { top: 65, left: 50 },
     ],
   };
 

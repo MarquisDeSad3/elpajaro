@@ -317,6 +317,8 @@ app.get('/show', noStore, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'sho
 app.get('/host', noStore, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'host.html')));
 
 app.use(express.static(PUBLIC_DIR));
+// Servir el JSON de ejemplo (si esta) — el panel del host lo fetchea via /data/...
+app.use('/data', express.static(path.join(__dirname, 'data')));
 
 /* ===== WebSocket ===== */
 const server = http.createServer(app);

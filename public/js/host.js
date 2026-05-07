@@ -482,21 +482,45 @@
   $('ctl-vote-end').addEventListener('click', async () => {
     try { await api('/api/host/match/voting/end', {}); toast('Votación cerrada'); } catch (e) { toast(e.message); }
   });
-  $('ctl-decide-left').addEventListener('click', async () => {
-    if (!confirm('Confirmar ganador IZQ?')) return;
-    try { await api('/api/host/match/decide', { matchId: selectedMatchId, winnerSide: 'left' }); toast('Ganador IZQ ✓'); selectedMatchId = null; }
-    catch (e) { toast(e.message); }
-  });
-  $('ctl-decide-right').addEventListener('click', async () => {
-    if (!confirm('Confirmar ganador DER?')) return;
-    try { await api('/api/host/match/decide', { matchId: selectedMatchId, winnerSide: 'right' }); toast('Ganador DER ✓'); selectedMatchId = null; }
-    catch (e) { toast(e.message); }
-  });
+  // Decide: 2 clicks confirmacion. Primer click el boton se pone en estado
+  // "armed" durante 3s; segundo click en ese intervalo confirma. Asi evitamos
+  // el confirm() nativo (que rompe automatizacion + es feo) sin perder el
+  // freno contra clicks accidentales en una accion irreversible.
+  function arm2Step(btnId, label, action) {
+    const btn = $(btnId);
+    let armed = false; let armTimer = null;
+    btn.addEventListener('click', async () => {
+      if (!armed) {
+        armed = true;
+        const original = btn.textContent;
+        btn.textContent = '¿SEGURO? (2do click)';
+        btn.style.outline = '4px solid var(--accent-yellow)';
+        armTimer = setTimeout(() => {
+          armed = false;
+          btn.textContent = original;
+          btn.style.outline = '';
+        }, 3000);
+        return;
+      }
+      clearTimeout(armTimer);
+      armed = false;
+      btn.style.outline = '';
+      try { await action(); toast(label + ' ✓'); }
+      catch (e) { toast(e.message); }
+    });
+  }
 
-  $('btn-reset').addEventListener('click', async () => {
-    if (!confirm('Esto borra el bracket y todos los resultados. Seguro?')) return;
-    try { await api('/api/host/reset', {}); toast('Reseteado'); selectedMatchId = null; }
-    catch (e) { toast(e.message); }
+  arm2Step('ctl-decide-left',  'Ganador IZQ', async () => {
+    await api('/api/host/match/decide', { matchId: selectedMatchId, winnerSide: 'left' });
+    selectedMatchId = null;
+  });
+  arm2Step('ctl-decide-right', 'Ganador DER', async () => {
+    await api('/api/host/match/decide', { matchId: selectedMatchId, winnerSide: 'right' });
+    selectedMatchId = null;
+  });
+  arm2Step('btn-reset', 'Reseteado', async () => {
+    await api('/api/host/reset', {});
+    selectedMatchId = null;
   });
 
   // ============= Live poll =============
