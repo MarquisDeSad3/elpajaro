@@ -237,39 +237,60 @@
       display: grid;
       grid-template-columns: 1fr auto 1fr;
       gap: 14px;
-      align-items: center;
+      align-items: stretch;
       margin-bottom: 16px;
     }
+    @media (max-width: 800px) {
+      .active-vs { grid-template-columns: 1fr; }
+      .active-vs-mark { display: none; }
+    }
     .active-side {
-      display: flex; gap: 12px; align-items: center;
+      display: flex; flex-direction: column; gap: 10px;
       background: var(--glass);
       border: 1px solid var(--glass-border);
       border-radius: var(--radius);
       padding: 12px;
       min-width: 0;
     }
-    .active-side .thumb {
-      width: 84px; height: 84px;
-      border-radius: var(--radius-sm);
-      overflow: hidden;
-      flex: 0 0 auto;
-      background: var(--ink);
+    .active-side .head { display: flex; flex-direction: column; gap: 2px; }
+    .active-side .head .country {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .68rem; letter-spacing: 2px;
     }
-    .active-side .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .active-side .info { min-width: 0; }
-    .active-side .info .name {
+    .active-side .head .country.cuba { color: var(--cuba-300); }
+    .active-side .head .country.pr   { color: var(--pr-300); }
+    .active-side .head .name {
       font-family: 'Bangers', cursive;
       font-size: 1.4rem; letter-spacing: 1px;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .active-side .info .country {
-      font-family: 'Archivo Black', sans-serif;
-      font-size: .68rem; letter-spacing: 2px;
+    .active-side .head .ig { font-size: .78rem; color: var(--muted); }
+    /* Embed inline: iframe arranca PAUSADO. Cada streamer le da play
+       independientemente desde su iframe — no se sincroniza el play. */
+    .active-side .embed-wrap {
+      width: 100%;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: var(--ink);
+      border: 1px solid var(--glass-border);
     }
-    .active-side .info .country.cuba { color: var(--cuba-300); }
-    .active-side .info .country.pr   { color: var(--pr-300); }
-    .active-side .info .ig { font-size: .78rem; color: var(--muted); margin-top: 2px; }
+    .active-side .embed-wrap iframe,
+    .active-side .embed-wrap video {
+      display: block;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: 0;
+      background: #000;
+    }
+    .active-side .embed-wrap audio { width: 100%; padding: 12px; background: var(--ink); }
+    .active-side .embed-wrap .link-fallback {
+      display: block; padding: 24px; text-align: center;
+      color: var(--gold);
+      font-family: 'Archivo Black', sans-serif; letter-spacing: 1px;
+      text-decoration: none;
+    }
     .active-vs-mark {
+      align-self: center;
       font-family: 'Bangers', cursive;
       font-size: 2.2rem; letter-spacing: 2px;
       background: var(--gold-grad);
@@ -417,21 +438,21 @@
         <span class="phase-tag" id="active-phase-tag">PRÓXIMO MATCH</span>
         <div class="active-vs">
           <div class="active-side">
-            <div class="thumb"><img id="active-left-thumb" alt="" /></div>
-            <div class="info">
+            <div class="head">
               <div class="country" id="active-left-country">—</div>
               <div class="name"    id="active-left-name">—</div>
               <div class="ig"      id="active-left-ig"></div>
             </div>
+            <div class="embed-wrap" id="active-left-embed"></div>
           </div>
           <div class="active-vs-mark">VS</div>
           <div class="active-side">
-            <div class="thumb"><img id="active-right-thumb" alt="" /></div>
-            <div class="info">
+            <div class="head">
               <div class="country" id="active-right-country">—</div>
               <div class="name"    id="active-right-name">—</div>
               <div class="ig"      id="active-right-ig"></div>
             </div>
+            <div class="embed-wrap" id="active-right-embed"></div>
           </div>
         </div>
 

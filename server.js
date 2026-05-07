@@ -413,21 +413,10 @@ app.post('/api/master/start-show', (req, res) => {
   const built = bracketMod.buildFromTeams(cuba.lockedTeam, pr.lockedTeam, { shuffle });
   if (!built.ok) return res.status(400).json({ ok: false, error: built.error });
 
-  // Mapear submissions -> contestants para que el bracket sepa nombre+url+etc
-  const contestants = {};
-  for (const id of [...cuba.lockedTeam, ...pr.lockedTeam]) {
-    const s = stateMod.getSubmission(id);
-    if (!s) continue;
-    contestants[id] = {
-      id: s.id,
-      name: s.name,
-      country: s.country,
-      photoUrl: '',           // sin foto en URL-only mode
-      bio: s.instagram ? '@' + s.instagram : '',
-      clipUrl: s.mediaUrl,
-      clipType: s.mediaType === 'audio' ? 'audio' : 'video',
-    };
-  }
+  // Usar buildContestants (el mismo helper del flujo auto) para que el manual
+  // tambien tenga clipKind/clipEmbed/clipEmbedAutoplay — sino el panel-master
+  // no puede embedar los videos en el active match box.
+  const contestants = buildContestants([...cuba.lockedTeam, ...pr.lockedTeam]);
   stateMod.startShow(contestants, built.pairings, built.bracket);
   res.json({ ok: true });
 });
@@ -568,22 +557,16 @@ app.post('/api/match/confirm', (req, res) => {
   if (!r) return res.status(400).json({ ok: false, error: 'No se pudo registrar.' });
 
   if (r.bothReady) {
-    // Avanzar de fase
+    // Avanzar de fase. Solo 2 transiciones (sin fase 'preview' intermedia):
+    //   idle   → voting  (chat empieza a votar)
+    //   voting → result  (cierra y decide por mayoria del chat)
+    // Los streamers ya estan reproduciendo los videos localmente en sus
+    // master panels (cada uno cuando quiere) — no se sincroniza el play.
     if (phase === 'idle') {
-      // → preview
-      voting.endNow();
-      stateMod.setCurrentMatch(matchId, 'preview');
-      stateMod.clearMatchConfirmations();
-      // Auto-broadcast play de los 2 clips a la vez
-      wsBus.broadcast({ type: 'clip-control', side: 'left',  action: 'play', ts: Date.now() });
-      wsBus.broadcast({ type: 'clip-control', side: 'right', action: 'play', ts: Date.now() });
-    } else if (phase === 'preview') {
-      // → voting (chat puede votar)
       stateMod.setCurrentMatch(matchId, 'voting', DEFAULT_VOTE_MS);
       voting.start({ mode: 'duel', targetId: matchId, durationMs: DEFAULT_VOTE_MS });
       stateMod.clearMatchConfirmations();
     } else if (phase === 'voting') {
-      // → result (cierra votacion antes de tiempo y decide por mayoria)
       autoDecideByChat(matchId);
       stateMod.clearMatchConfirmations();
     }

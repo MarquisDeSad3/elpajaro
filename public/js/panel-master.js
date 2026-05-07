@@ -392,14 +392,17 @@
 
   /* ===== Show running — bracket UI =====
    * Reemplaza el placeholder "EL SHOW EN VIVO" por la UI real del bracket:
-   * - Active match box: el match en juego ahora con miniaturas + LISTO button
-   * - Match list: todos los matches del bracket organizados por ronda
+   * - Active match box: el match en juego AHORA con LOS DOS VIDEOS embebidos
+   *   (siempre en pausa — cada streamer aprieta play independientemente).
+   * - Match list: todos los matches del bracket organizados por ronda.
    *
    * Flujo del LISTO button (solo en role-locked views /cuba y /pr):
-   *   Match en idle    → LISTO 1 → ambos confirman → preview (videos suenan)
-   *   Match en preview → LISTO 2 → ambos confirman → voting (chat vota)
-   *   Match en voting  → LISTO 3 → ambos confirman → cierra y decide por mayoria
+   *   Match en idle    → LISTO 1 → ambos confirman → voting (chat vota)
+   *   Match en voting  → LISTO 2 → ambos confirman → cierra y decide por mayoria
    *                       O alternativamente espera el timeout del timer.
+   *
+   * Los videos NO se sincronizan: cada streamer mira/escucha cuando quiere.
+   * Lo unico que se sincroniza es la apertura/cierre del voto del chat.
    *
    * En vista publica /panel/master: solo se ve, no se interactua.
    */
@@ -441,9 +444,10 @@
     const a = cs[match.leftId];
     const b = cs[match.rightId];
 
-    // Phase tag
-    const tagText = phase === 'idle'    ? 'PRÓXIMO MATCH'
-                  : phase === 'preview' ? 'PREVIEW · ESCUCHANDO LOS 2 VIDEOS'
+    // Phase tag — solo 3 estados: idle (videos en pausa), voting (chat decide), result.
+    // 'preview' ya no existe: los videos estan SIEMPRE embebidos en pausa
+    // desde que el match es el active, los streamers le dan play cuando quieren.
+    const tagText = phase === 'idle'    ? 'PRÓXIMO MATCH · MIRÁ AMBOS VIDEOS'
                   : phase === 'voting'  ? 'VOTANDO · CHAT DECIDE'
                   : phase === 'result'  ? 'GANADOR'
                                         : 'IDLE';
@@ -471,11 +475,12 @@
     const myConfirmed   = matchesCurrent && (myRole === 'cuba' ? conf.cubaConfirmed : conf.prConfirmed);
     const otherConfirmed = matchesCurrent && (myRole === 'cuba' ? conf.prConfirmed : conf.cubaConfirmed);
 
-    // Texto del boton segun fase
+    // Texto del boton segun fase. Solo 2 transiciones (idle→voting→result):
+    //   PASO 1: ambos vieron los videos en pausa → ABRIR VOTACION
+    //   PASO 2: chat ya voto bastante → CERRAR VOTACION (autodecide por mayoria)
     const buttonByPhase = {
-      idle:    { step: 'PASO 1 DE 3', label: '▶ LISTO — ARRANCAR PREVIEW' },
-      preview: { step: 'PASO 2 DE 3', label: '▶ LISTO — ABRIR VOTACIÓN' },
-      voting:  { step: 'PASO 3 DE 3', label: '⏹ LISTO — CERRAR VOTACIÓN' },
+      idle:    { step: 'PASO 1 DE 2', label: '▶ LISTO — ABRIR VOTACIÓN' },
+      voting:  { step: 'PASO 2 DE 2', label: '⏹ LISTO — CERRAR VOTACIÓN' },
     };
     const phaseUI = buttonByPhase[phase];
     if (phaseUI) {
@@ -502,14 +507,20 @@
     `;
   }
 
+  /**
+   * Pinta UN lado del active match: header (pais/nombre/ig) + embed.
+   *
+   * El embed se monta UNA SOLA VEZ por contestant (trackeo via dataset.contestantId).
+   * Esto es critico: cada vez que llega un broadcast del WS, renderActiveMatch
+   * vuelve a correr — si recreamos el iframe en cada render, el video se
+   * resetea a 0 y el streamer pierde lo que estaba escuchando. Solo
+   * destruimos+recreamos cuando cambia el contestant (match siguiente).
+   *
+   * El src usado es c.clipEmbed (sin autoplay) para que el iframe arranque
+   * pausado. Cada streamer le da play independientemente desde su browser.
+   */
   function fillSide(side, c) {
-    const thumb = $(`active-${side}-thumb`);
-    if (c?.clipThumbnail) {
-      thumb.src = c.clipThumbnail;
-      thumb.style.display = '';
-    } else {
-      thumb.style.display = 'none';
-    }
+    // Header
     $(`active-${side}-name`).textContent = c?.name || '?';
     $(`active-${side}-ig`).textContent = c?.bio || (c?.instagram ? '@' + c.instagram : '');
     const country = c?.country === 'cuba' ? 'CUBA' : c?.country === 'pr' ? 'PR' : '';
@@ -517,6 +528,49 @@
     countryEl.textContent = country;
     countryEl.classList.remove('cuba', 'pr');
     if (c?.country) countryEl.classList.add(c.country);
+
+    // Embed (solo recrear si cambio el contestant — para no resetear el video)
+    const wrap = $(`active-${side}-embed`);
+    if (!wrap) return;
+    const currentId = wrap.dataset.contestantId || '';
+    const newId = c?.id || '';
+    if (currentId === newId) return;
+    wrap.dataset.contestantId = newId;
+    wrap.innerHTML = '';
+    if (!c) return;
+
+    const kind = c.clipKind || (c.clipEmbed ? 'iframe' : 'link');
+    if (kind === 'iframe' && c.clipEmbed) {
+      const ifr = document.createElement('iframe');
+      ifr.src = c.clipEmbed;  // version SIN autoplay → arranca pausado
+      ifr.setAttribute('allow',
+        'accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
+      ifr.setAttribute('allowfullscreen', '');
+      ifr.referrerPolicy = 'strict-origin-when-cross-origin';
+      ifr.loading = 'lazy';
+      wrap.appendChild(ifr);
+    } else if (kind === 'video' && c.clipUrl) {
+      const v = document.createElement('video');
+      v.src = c.clipUrl;
+      v.controls = true;
+      v.preload = 'metadata';
+      wrap.appendChild(v);
+    } else if (kind === 'audio' && c.clipUrl) {
+      const a = document.createElement('audio');
+      a.src = c.clipUrl;
+      a.controls = true;
+      a.preload = 'metadata';
+      wrap.appendChild(a);
+    } else {
+      // Fallback: link externo (Drive raro / kind=link / sin clipEmbed)
+      const link = document.createElement('a');
+      link.href = c.clipUrl || c.mediaUrl || '#';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.className = 'link-fallback';
+      link.textContent = '↗ ABRIR ENLACE EN PESTAÑA NUEVA';
+      wrap.appendChild(link);
+    }
   }
 
   function renderBracketList() {
