@@ -135,6 +135,40 @@ app.get('/api/state', (_req, res) => {
   res.json({ ok: true, state: stateMod.snapshot(), poll: voting.getActive() });
 });
 
+/* ===== Health / persistence check (sin auth, debug only) =====
+ * Devuelve la ruta donde se persiste el state.json y si el archivo existe.
+ * Util para verificar desde afuera si el disco persistente esta bien
+ * montado (debe decir /var/data/state.json y exists:true tras el primer save).
+ */
+app.get('/api/health', (_req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  const stateDir = process.env.STATE_DIR || path.join(__dirname, 'data');
+  const statePath = path.join(stateDir, 'state.json');
+  let exists = false, sizeBytes = 0;
+  try {
+    const stat = fs.statSync(statePath);
+    exists = true;
+    sizeBytes = stat.size;
+  } catch {}
+  const counts = stateMod.snapshot().countries;
+  res.json({
+    ok: true,
+    persistence: {
+      stateDir,
+      statePath,
+      stateFileExists: exists,
+      stateFileSizeBytes: sizeBytes,
+      stateDirEnvVarSet: !!process.env.STATE_DIR,
+    },
+    counts: {
+      cuba: counts.cuba.counts.total,
+      pr:   counts.pr.counts.total,
+    },
+    uptimeSec: Math.floor(process.uptime()),
+  });
+});
+
 /* ===== Public submission ===== */
 const submitRate = new Map();   // ip -> { count, resetAt }
 function submitThrottle(ip) {
