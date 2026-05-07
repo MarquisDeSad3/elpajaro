@@ -150,25 +150,35 @@
     showLogin();
   }
 
-  /* ===== Render slots ===== */
+  /* ===== Render slots =====
+   * lockedTeam ahora viene del snapshot como array de objetos con
+   * { id, name, instagram, clipThumbnail, clipKind, ... } — no solo IDs.
+   * Asi el master puede mostrar miniatura + nombre en cada slot apenas
+   * el streamer cierra su equipo (sin esperar a que arranque el show). */
   function renderSlots(country) {
     const c = serverState?.countries?.[country];
     const grid = $(`slots-${country}`);
     grid.innerHTML = '';
     const team = c?.lockedTeam || [];
-    // Si no esta lockeado, mostramos los que ya pasaron (eliminationDecision='passed')
-    // Pero el snapshot publico no expone los submissions, asi que usamos lockedTeam
-    // (el lock pone los 8 finalistas; antes del lock el array esta vacio).
-    // Mostramos siempre 8 slots, llenos o vacios.
     for (let i = 0; i < 8; i++) {
-      const id = team[i];
+      const finalist = team[i];   // objeto o undefined
       const slot = document.createElement('div');
-      const filledClass = id ? 'filled ' + country : 'empty';
-      slot.className = 'slot ' + filledClass;
-      slot.innerHTML = `
-        <div class="num">${i + 1}</div>
-        ${id ? renderContestantCell(id) : '<div class="name">—</div>'}
-      `;
+      slot.className = 'slot ' + (finalist ? 'filled ' + country : 'empty');
+      if (finalist) {
+        const thumb = finalist.clipThumbnail
+          ? `<img class="slot-thumb" src="${escapeHtml(finalist.clipThumbnail)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+          : '';
+        slot.innerHTML = `
+          <div class="num">${i + 1}</div>
+          ${thumb}
+          <div class="slot-info">
+            <div class="name">${escapeHtml(finalist.name || 'FINALISTA')}</div>
+            ${finalist.instagram ? `<div class="ig">@${escapeHtml(finalist.instagram)}</div>` : ''}
+          </div>
+        `;
+      } else {
+        slot.innerHTML = `<div class="num">${i + 1}</div><div class="name">—</div>`;
+      }
       grid.appendChild(slot);
     }
 
@@ -182,19 +192,6 @@
       const passed = c?.counts?.passed || 0;
       statusEl.innerHTML = `${passed}/8 pasados — siguen las eliminaciones`;
     }
-  }
-
-  function renderContestantCell(id) {
-    const cs = serverState?.contestants;
-    const c = cs && cs[id];
-    if (c) {
-      return `<div class="name">${escapeHtml(c.name)}</div>${c.bio ? `<div class="ig">${escapeHtml(c.bio)}</div>` : ''}`;
-    }
-    // No tenemos contestants poblado pre-show. El nombre vendria del lockedTeam ID.
-    // Para mostrar el nombre real pre-show, necesitamos pedirlo al server.
-    // Por ahora mostramos un placeholder que el WS update reemplazara cuando
-    // el contestants este populado (al EMPEZAR show).
-    return `<div class="name">FINALISTA</div><div class="ig">${id.slice(0, 6)}</div>`;
   }
 
   /* ===== Ready buttons ===== */

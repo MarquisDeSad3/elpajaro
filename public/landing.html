@@ -238,9 +238,10 @@
       ? '<span class="badge badge-cuba">8 LISTOS</span>'
       : '<span class="badge badge-gray">no cerrado</span>';
     if (cuba.teamLocked && cuba.lockedTeam.length) {
-      $('cuba-team-list').innerHTML = cuba.lockedTeam.map(id => {
-        const c = state.contestants?.[id];
-        return `<div class="name">${c ? escapeHtml(c.name) : id.slice(0,6)}</div>`;
+      // lockedTeam ahora viene como array de objetos {id, name, ...}
+      $('cuba-team-list').innerHTML = cuba.lockedTeam.map(f => {
+        const name = f?.name || 'FINALISTA';
+        return `<div class="name">${escapeHtml(name)}</div>`;
       }).join('');
     } else {
       $('cuba-team-list').innerHTML = '';
@@ -256,9 +257,9 @@
       ? '<span class="badge badge-pr">8 LISTOS</span>'
       : '<span class="badge badge-gray">no cerrado</span>';
     if (pr.teamLocked && pr.lockedTeam.length) {
-      $('pr-team-list').innerHTML = pr.lockedTeam.map(id => {
-        const c = state.contestants?.[id];
-        return `<div class="name">${c ? escapeHtml(c.name) : id.slice(0,6)}</div>`;
+      $('pr-team-list').innerHTML = pr.lockedTeam.map(f => {
+        const name = f?.name || 'FINALISTA';
+        return `<div class="name">${escapeHtml(name)}</div>`;
       }).join('');
     } else {
       $('pr-team-list').innerHTML = '';

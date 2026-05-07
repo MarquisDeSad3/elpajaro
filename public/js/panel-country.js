@@ -552,19 +552,21 @@
     }, 200);
   }
 
-  /* ===== Closed (8 lockeados) ===== */
+  /* ===== Closed (8 lockeados) =====
+   * lockedTeam viene del snapshot como array de objetos completos, asi que
+   * leemos directo en vez de buscar en countryItems. */
   function renderClosed() {
     const c = serverState?.countries?.[role];
     if (!c?.teamLocked) return;
     const list = $('closed-list');
-    list.innerHTML = c.lockedTeam.map((id, i) => {
-      const s = countryItems.find(x => x.id === id);
-      if (!s) return `<div class="closed-item"><div class="num">#${i+1}</div><div class="name">${id.slice(0,8)}</div></div>`;
+    list.innerHTML = c.lockedTeam.map((f, i) => {
+      const name = f?.name || 'FINALISTA';
+      const ig = f?.instagram ? '@' + escapeHtml(f.instagram) : '';
       return `
         <div class="closed-item">
           <div class="num">#${i+1}</div>
-          <div class="name">${escapeHtml(s.name)}</div>
-          <div class="ig">${s.instagram ? '@' + escapeHtml(s.instagram) : ''}</div>
+          <div class="name">${escapeHtml(name)}</div>
+          <div class="ig">${ig}</div>
         </div>
       `;
     }).join('');
