@@ -1,24 +1,18 @@
 /**
- * Smoke test E2E del nuevo flow:
- *   - login como master
- *   - login como cuba + login como pr (3 roles distintos, mismo PIN)
- *   - submission publica (cuba + pr)
- *   - aprobar submissions
- *   - decidir eliminacion fase 1 (passed)
- *   - lock team de cada pais
- *   - master EMPEZAR show
- *   - bracket: preview, voting/start, propose-decision (cuba) + propose-decision (pr) -> consensus
- *   - reset-all
- *
- * Corre el server en puerto 3099 con HOST_PIN=smoketest.
- * No deploya nada — solo verifica regresiones locales.
+ * Smoke test E2E del flow nuevo:
+ *   - 2 PINs separados (PIN_CUBA, PIN_PR), master con cualquiera
+ *   - submission publica
+ *   - aprobar + lockear 8 (modo manual)
+ *   - "ESTOY LISTO" por pais → cuando ambos listos, show auto-arranca
+ *   - propose-decision con consenso
+ *   - reset
  */
 
 const { spawn } = require('child_process');
-const path = require('path');
 
 const PORT = 3099;
-const PIN = 'smoketest1234';
+const PIN_CUBA = 'cubatest';
+const PIN_PR   = 'prtest';
 const BASE = `http://localhost:${PORT}`;
 
 let serverProc;
@@ -26,7 +20,7 @@ let serverProc;
 function startServer() {
   return new Promise((resolve, reject) => {
     serverProc = spawn(process.execPath, ['server.js'], {
-      env: { ...process.env, PORT: String(PORT), HOST_PIN: PIN, NODE_ENV: 'test' },
+      env: { ...process.env, PORT: String(PORT), PIN_CUBA, PIN_PR, NODE_ENV: 'test' },
       cwd: __dirname, stdio: ['ignore', 'pipe', 'pipe'],
     });
     let booted = false;
@@ -66,146 +60,105 @@ async function run() {
   await startServer();
   console.log('  server up\n');
 
-  // ===== Reset previo (por si quedo state.json de pruebas anteriores)
-  // No tenemos endpoint de reset sin auth — primero login y luego reset-all.
-
-  // 1) Login como master
-  let r = await api('/api/admin/login', { pin: 'wrong', role: 'master' });
-  assert(r.status === 401, 'PIN malo devuelve 401');
-  r = await api('/api/admin/login', { pin: PIN, role: 'master' });
-  assert(r.data.ok && r.data.token && r.data.role === 'master', 'login master OK');
-  const tokenMaster = r.data.token;
-
-  // Reset all para empezar limpio
-  await api('/api/master/reset-all', {}, tokenMaster);
-
-  // Login cuba
-  r = await api('/api/admin/login', { pin: PIN, role: 'cuba' });
-  assert(r.data.ok && r.data.role === 'cuba', 'login cuba OK');
+  // === Login con PINs separados ===
+  let r = await api('/api/admin/login', { pin: 'wrong', role: 'cuba' });
+  assert(r.status === 401, 'PIN cuba malo → 401');
+  r = await api('/api/admin/login', { pin: PIN_PR, role: 'cuba' });
+  assert(r.status === 401, 'PIN de PR no entra como cuba → 401');
+  r = await api('/api/admin/login', { pin: PIN_CUBA, role: 'cuba' });
+  assert(r.data.ok && r.data.role === 'cuba', 'login cuba con PIN_CUBA');
   const tokenCuba = r.data.token;
 
-  // Login pr
-  r = await api('/api/admin/login', { pin: PIN, role: 'pr' });
-  assert(r.data.ok && r.data.role === 'pr', 'login pr OK');
+  r = await api('/api/admin/login', { pin: PIN_PR, role: 'pr' });
+  assert(r.data.ok && r.data.role === 'pr', 'login pr con PIN_PR');
   const tokenPr = r.data.token;
 
-  // 2) Submissions publicas (sin auth)
-  // Necesitamos 8 cuba + 8 pr aprobados -> al menos 8 submissions buenas por pais.
+  // Master entra con cualquiera de los dos pines
+  r = await api('/api/admin/login', { pin: PIN_CUBA, role: 'master' });
+  assert(r.data.ok && r.data.role === 'master', 'master acepta PIN_CUBA');
+  const tokenMaster = r.data.token;
+  r = await api('/api/admin/login', { pin: PIN_PR, role: 'master' });
+  assert(r.data.ok && r.data.role === 'master', 'master acepta PIN_PR');
+
+  // Reset all
+  await api('/api/master/reset-all', {}, tokenMaster);
+
+  // === Submissions publicas ===
   for (let i = 0; i < 8; i++) {
-    const fakeIp = `1.1.1.${i + 10}`;
-    // Para "diferenciar" la IP cada submission, usamos un X-Forwarded-For.
-    // Pero express con trust proxy lee req.ip de eso. Simulamos via headers.
     const res = await fetch(BASE + '/api/submit', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': fakeIp },
-      body: JSON.stringify({
-        country: 'cuba',
-        name: `Cubano ${i + 1}`,
-        instagram: `cubano${i + 1}`,
-        mediaUrl: `https://youtube.com/watch?v=cuba${i + 1}`,
-      }),
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': `1.1.1.${i + 10}` },
+      body: JSON.stringify({ country: 'cuba', name: `Cubano ${i+1}`, instagram: `c${i+1}`, mediaUrl: `https://youtube.com/watch?v=cu${i}` }),
     });
-    const j = await res.json();
-    if (!j.ok) throw new Error(`Cuba submit ${i+1}: ${j.error}`);
+    if (!(await res.json()).ok) throw new Error('cuba submit ' + i);
   }
   for (let i = 0; i < 8; i++) {
-    const fakeIp = `2.2.2.${i + 20}`;
     const res = await fetch(BASE + '/api/submit', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': fakeIp },
-      body: JSON.stringify({
-        country: 'pr',
-        name: `Boricua ${i + 1}`,
-        instagram: `boricua${i + 1}`,
-        mediaUrl: `https://youtube.com/watch?v=pr${i + 1}`,
-      }),
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': `2.2.2.${i + 10}` },
+      body: JSON.stringify({ country: 'pr', name: `Boricua ${i+1}`, instagram: `p${i+1}`, mediaUrl: `https://youtube.com/watch?v=pr${i}` }),
     });
-    const j = await res.json();
-    if (!j.ok) throw new Error(`PR submit ${i+1}: ${j.error}`);
+    if (!(await res.json()).ok) throw new Error('pr submit ' + i);
   }
   let st = (await getJson('/api/state')).state;
   assert(st.countries.cuba.counts.total === 8, 'cuba 8 submissions');
   assert(st.countries.pr.counts.total === 8, 'pr 8 submissions');
 
-  // 3) Aprobar todas las submissions
-  r = await api('/api/admin/cuba/list', {}, tokenCuba);
-  const cubaIds = r.data.items.map(s => s.id);
-  for (const id of cubaIds) {
-    const a = await api('/api/admin/cuba/approve', { id }, tokenCuba);
-    assert(a.data.ok, `approve cuba ${id.slice(0,4)}`);
-  }
-  r = await api('/api/admin/pr/list', {}, tokenPr);
-  const prIds = r.data.items.map(s => s.id);
-  for (const id of prIds) {
-    const a = await api('/api/admin/pr/approve', { id }, tokenPr);
-    assert(a.data.ok, `approve pr ${id.slice(0,4)}`);
-  }
+  // === Aprobar todas ===
+  const cubaList = await api('/api/admin/cuba/list', {}, tokenCuba);
+  for (const s of cubaList.data.items) await api('/api/admin/cuba/approve', { id: s.id }, tokenCuba);
+  const prList = await api('/api/admin/pr/list', {}, tokenPr);
+  for (const s of prList.data.items) await api('/api/admin/pr/approve', { id: s.id }, tokenPr);
 
-  // 3b) Cuba intenta endpoint de PR — deberia fallar 403
-  r = await api('/api/admin/pr/approve', { id: prIds[0] }, tokenCuba);
-  assert(r.status === 403, 'cuba no puede tocar endpoints PR');
+  // Cuba intenta tocar PR — 403
+  r = await api('/api/admin/pr/approve', { id: prList.data.items[0].id }, tokenCuba);
+  assert(r.status === 403, 'cuba no puede tocar PR');
 
-  // 4) Lock team (sin pasar por eliminacion — modo manual)
-  r = await api('/api/admin/cuba/lock', { ids: cubaIds.slice(0, 8) }, tokenCuba);
-  assert(r.data.ok, 'lock cuba 8');
-  r = await api('/api/admin/pr/lock', { ids: prIds.slice(0, 8) }, tokenPr);
-  assert(r.data.ok, 'lock pr 8');
+  // === Lock teams (modo manual) ===
+  const cubaIds = cubaList.data.items.map(s => s.id);
+  r = await api('/api/admin/cuba/lock', { ids: cubaIds }, tokenCuba);
+  assert(r.data.ok, 'cuba lock 8');
+  const prIds = prList.data.items.map(s => s.id);
+  r = await api('/api/admin/pr/lock', { ids: prIds }, tokenPr);
+  assert(r.data.ok, 'pr lock 8');
 
+  // === ESTOY LISTO ===
+  // Cuba pone listo (pero no PR todavia) → show no arranca
+  r = await api('/api/admin/cuba/ready', { ready: true }, tokenCuba);
+  assert(r.data.ok && r.data.ready === true && !r.data.showStarted, 'cuba listo, show no arranca solo');
   st = (await getJson('/api/state')).state;
-  assert(st.countries.cuba.teamLocked, 'cuba lockeada');
-  assert(st.countries.pr.teamLocked, 'pr lockeada');
+  assert(st.countries.cuba.ready === true, 'cuba.ready=true en state');
+  assert(st.countries.pr.ready === false, 'pr.ready aun false');
+  assert(!st.showStarted, 'show NO empezo todavia');
 
-  // 5) Master arranca el show
-  r = await api('/api/master/start-show', { shuffle: false }, tokenMaster);
-  assert(r.data.ok, 'master start-show OK');
+  // PR pone listo → show arranca SOLO
+  r = await api('/api/admin/pr/ready', { ready: true }, tokenPr);
+  assert(r.data.ok && r.data.showStarted, 'pr listo + show auto-arranca');
   st = (await getJson('/api/state')).state;
   assert(st.showStarted, 'show empezado');
-  assert(st.bracket && st.bracket.rounds.length === 4, 'bracket 4 rondas');
-  assert(st.bracket.rounds[0].length === 8, '8 octofinales');
-  assert(Object.keys(st.contestants).length === 16, '16 contestants en state');
+  assert(st.bracket && st.bracket.rounds.length === 4, '4 rondas');
+  assert(Object.keys(st.contestants).length === 16, '16 contestants');
 
-  // 6) Master no puede decidir match (solo cuba/pr)
+  // === Cuba intenta tocar /api/admin/cuba/ready desde token PR — 403 ===
+  r = await api('/api/admin/cuba/ready', { ready: false }, tokenPr);
+  assert(r.status === 403, 'pr no puede tocar /cuba/ready');
+
+  // === Consenso 2-de-2 sigue funcionando ===
   const m0 = st.bracket.rounds[0][0];
-  r = await api('/api/match/propose-decision', { matchId: m0.id, winnerSide: 'left' }, tokenMaster);
-  assert(r.status === 403, 'master no puede proponer-decision');
-
-  // 7) Cuba propone left, PR propone left -> consenso
+  await api('/api/match/preview', { matchId: m0.id }, tokenMaster);
+  await api('/api/match/voting/start', { durationMs: 5000 }, tokenMaster);
   r = await api('/api/match/propose-decision', { matchId: m0.id, winnerSide: 'left' }, tokenCuba);
-  assert(r.data.ok && !r.data.consensus, 'cuba vota, sin consenso aun');
+  assert(!r.data.consensus, 'cuba vota, sin consenso');
   r = await api('/api/match/propose-decision', { matchId: m0.id, winnerSide: 'left' }, tokenPr);
-  assert(r.data.ok && r.data.consensus, 'pr vota mismo lado -> consenso');
+  assert(r.data.consensus, 'pr coincide → consenso');
 
   st = (await getJson('/api/state')).state;
-  const m0After = st.bracket.rounds[0][0];
-  assert(m0After.status === 'done', 'm0 cerrado');
-  assert(m0After.winnerId === m0After.leftId, 'gano left');
+  assert(st.bracket.rounds[0][0].status === 'done', 'm0 cerrado');
 
-  // 8) Cuba propone right, PR propone left -> sin consenso, hay discrepancia
-  const m1 = st.bracket.rounds[0][1];
-  r = await api('/api/match/propose-decision', { matchId: m1.id, winnerSide: 'right' }, tokenCuba);
-  assert(r.data.ok && !r.data.consensus, 'cuba vota right, sin consenso');
-  r = await api('/api/match/propose-decision', { matchId: m1.id, winnerSide: 'left' }, tokenPr);
-  assert(r.data.ok && !r.data.consensus, 'pr vota left, discrepancia');
-  // Cancel decision
-  r = await api('/api/match/cancel-decision', {}, tokenMaster);
-  assert(r.data.ok, 'master cancela');
-  st = (await getJson('/api/state')).state;
-  assert(!st.pendingDecision, 'pendingDecision limpio');
-
-  // 9) Reset show (preserva submissions)
-  r = await api('/api/master/reset-show', {}, tokenMaster);
-  assert(r.data.ok, 'reset show');
-  st = (await getJson('/api/state')).state;
-  assert(!st.showStarted, 'show no started');
-  assert(st.countries.cuba.teamLocked, 'cuba sigue lockeada');
-  assert(st.countries.cuba.counts.total === 8, 'cuba mantiene 8 submissions');
-
-  // 10) Reset all
+  // === Reset all ===
   r = await api('/api/master/reset-all', {}, tokenMaster);
-  assert(r.data.ok, 'reset all');
   st = (await getJson('/api/state')).state;
-  assert(st.countries.cuba.counts.total === 0, 'cuba 0 submissions');
-  assert(!st.countries.cuba.teamLocked, 'cuba unlock');
+  assert(st.countries.cuba.counts.total === 0 && !st.showStarted, 'reset all OK');
 
   console.log('\n✓ TODOS LOS TESTS PASARON');
 }

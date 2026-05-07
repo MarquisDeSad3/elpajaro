@@ -300,6 +300,43 @@ function mountCountryRoutes(country) {
     stateMod.setSubmissionsOpen(country, !!req.body?.open);
     res.json({ ok: true });
   });
+
+  /**
+   * "ESTOY LISTO" — el streamer del pais marca su lado como listo para
+   * arrancar el bracket. Requiere haber lockeado los 8.
+   * Cuando ambos paises estan ready=true, el show arranca automaticamente
+   * (sin boton "EMPEZAR" extra).
+   */
+  app.post(`/api/admin/${country}/ready`, (req, res) => {
+    if (!guard(req, res)) return;
+    const ready = !!req.body?.ready;
+    const r = stateMod.setReady(country, ready);
+    if (!r.ok) return res.status(400).json({ ok: false, error: r.error });
+
+    // Si ambos quedaron listos, auto-arranca el show
+    if (r.bothReady && !stateMod.state.showStarted) {
+      const cubaTeam = stateMod.state.countries.cuba.lockedTeam;
+      const prTeam   = stateMod.state.countries.pr.lockedTeam;
+      const built = bracketMod.buildFromTeams(cubaTeam, prTeam, { shuffle: true });
+      if (built.ok) {
+        const contestants = {};
+        for (const id of [...cubaTeam, ...prTeam]) {
+          const s = stateMod.getSubmission(id);
+          if (!s) continue;
+          contestants[id] = {
+            id: s.id, name: s.name, country: s.country,
+            photoUrl: '',
+            bio: s.instagram ? '@' + s.instagram : '',
+            clipUrl: s.mediaUrl,
+            clipType: s.mediaType === 'audio' ? 'audio' : 'video',
+          };
+        }
+        stateMod.startShow(contestants, built.pairings, built.bracket);
+        return res.json({ ok: true, ready, bothReady: true, showStarted: true });
+      }
+    }
+    res.json({ ok: true, ready, bothReady: r.bothReady });
+  });
 }
 mountCountryRoutes('cuba');
 mountCountryRoutes('pr');

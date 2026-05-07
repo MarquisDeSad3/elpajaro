@@ -1,15 +1,18 @@
 /**
- * Panel master — orquestacion del show.
+ * Panel master — pantalla compartida para los dos streamers.
  *
- * Funciones:
- *  - PIN gate (role=master)
- *  - Conexion OAuth de Twitch para los dos canales
- *  - Status visual de ambos paises (locked / counts / etc)
- *  - Boton EMPEZAR (cuando ambos lockeados)
- *  - Durante el show: bracket view + controles de match flow
- *    (preview, clips, abrir/cerrar votacion). La decision del ganador
- *    NO se hace aca — la votan cuba+pr desde sus paneles (consenso 2-de-2).
- *  - Reset show / reset all
+ * Pre-show:
+ *   - 8 slots Cuba + 8 slots PR (se llenan en tiempo real cuando cada
+ *     streamer pasa cantantes en su /panel/cuba o /panel/pr).
+ *   - Boton "ESTOY LISTO" por lado:
+ *       · habilitado SOLO cuando ese lado tiene los 8 lockeados
+ *       · clickeable SOLO por el rol que matchea (cuba session puede
+ *         tocar el de Cuba; pr session el de PR; master se logueo con
+ *         alguno de los dos PINs y solo puede tocar el del PIN que uso)
+ *   - Cuando ambos lados quedan ready=true, el server arranca el show solo.
+ *
+ * Show running:
+ *   - Mensaje + links a /show, /panel/cuba, /panel/pr
  */
 
 (() => {
@@ -17,8 +20,8 @@
 
   const TOKEN_KEY = 'elpajaro.token.master';
   let token = localStorage.getItem(TOKEN_KEY) || null;
+  let session = null;       // { role: 'cuba'|'pr'|'master' }
   let serverState = null;
-  let selectedMatchId = null;
 
   const $ = (id) => document.getElementById(id);
 
@@ -54,29 +57,42 @@
     toast._t = setTimeout(() => t.classList.remove('show'), ms);
   }
 
-  /* ===== Login ===== */
+  /* ===== Login =====
+   * El master no sabe de antemano quien es el que se loguea — acepta los
+   * dos PINs (cuba y pr) y el server le devuelve el rol asociado al pin
+   * que el cliente envio. Probamos primero con role='cuba'; si falla,
+   * probamos con 'pr'. Ese intento doble es el costo de tener un solo
+   * input de PIN para una pantalla compartida.
+   */
   $('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const pin = $('pin').value;
-    try {
-      const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin, role: 'master' }),
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || 'PIN incorrecto');
-      token = data.token;
-      localStorage.setItem(TOKEN_KEY, token);
-      serverState = data.state;
-      showMain();
-    } catch (e) { $('login-error').textContent = e.message; }
+    $('login-error').textContent = '';
+    for (const tryRole of ['cuba', 'pr', 'master']) {
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin, role: tryRole }),
+        });
+        const data = await res.json();
+        if (data.ok && data.token) {
+          token = data.token;
+          session = { role: data.role };
+          localStorage.setItem(TOKEN_KEY, token);
+          serverState = data.state;
+          showMain();
+          return;
+        }
+      } catch {}
+    }
+    $('login-error').textContent = 'PIN incorrecto.';
   });
 
   function logout(silent = false) {
     if (!silent) api('/api/admin/logout', {}).catch(() => {});
     localStorage.removeItem(TOKEN_KEY);
-    token = null;
+    token = null; session = null;
     showLogin();
   }
   $('btn-logout').addEventListener('click', () => logout());
@@ -88,249 +104,138 @@
     if (!token) { showLogin(); return; }
     try {
       const r = await api('/api/admin/validate', {});
-      if (r.role !== 'master') {
-        toast('Esta sesion era de otro rol — re-ingresá');
-        logout(true); return;
-      }
+      session = { role: r.role };
       serverState = r.state;
+      // Update role tag color based on session role
+      const tag = document.querySelector('.role-tag');
+      if (tag) {
+        tag.textContent = r.role.toUpperCase();
+        tag.classList.remove('role-cuba', 'role-pr', 'role-master');
+        tag.classList.add('role-' + r.role);
+      }
       showMain();
     } catch { showLogin(); }
   }
 
-  /* ===== Twitch buttons ===== */
-  $('btn-conn-cuba').addEventListener('click', () => {
-    window.open('/api/twitch/auth?from=cuba', 'twitchAuth', 'width=720,height=820');
-  });
-  $('btn-conn-pr').addEventListener('click', () => {
-    window.open('/api/twitch/auth?from=pr', 'twitchAuth', 'width=720,height=820');
-  });
-
-  function renderTwitch() {
-    const tw = serverState?.twitchConnections || {};
-    $('dot-cuba').classList.toggle('live', !!tw.cuba?.connected);
-    $('dot-pr').classList.toggle('live',   !!tw.pr?.connected);
-    $('label-cuba').textContent = tw.cuba?.connected ? `CUBA · ${tw.cuba.name || 'on'}` : 'CONECTAR CUBA';
-    $('label-pr').textContent   = tw.pr?.connected   ? `PR · ${tw.pr.name || 'on'}`     : 'CONECTAR PR';
-  }
-
-  /* ===== Country status ===== */
-  function renderCountryStatus() {
-    if (!serverState) return;
-    const cap = serverState.submissionsCap || 50;
-
-    for (const country of ['cuba', 'pr']) {
-      const c = serverState.countries[country];
-      $(`${country}-count`).textContent = c.counts.total;
-      $(`${country}-cap`).textContent = cap;
-      $(`${country}-approved`).textContent = c.counts.approved;
-      $(`${country}-passed`).textContent = `${c.counts.passed}/8`;
-      $(`${country}-open`).textContent = c.submissionsOpen ? 'ABIERTAS' : 'CERRADAS';
-
-      const ready = $(`${country}-ready`);
-      if (c.teamLocked) {
-        ready.textContent = '✓ EQUIPO LISTO';
-        ready.classList.add('yes'); ready.classList.remove('no');
-      } else {
-        ready.textContent = '✗ Pendiente';
-        ready.classList.add('no'); ready.classList.remove('yes');
-      }
+  /* ===== Render slots ===== */
+  function renderSlots(country) {
+    const c = serverState?.countries?.[country];
+    const grid = $(`slots-${country}`);
+    grid.innerHTML = '';
+    const team = c?.lockedTeam || [];
+    // Si no esta lockeado, mostramos los que ya pasaron (eliminationDecision='passed')
+    // Pero el snapshot publico no expone los submissions, asi que usamos lockedTeam
+    // (el lock pone los 8 finalistas; antes del lock el array esta vacio).
+    // Mostramos siempre 8 slots, llenos o vacios.
+    for (let i = 0; i < 8; i++) {
+      const id = team[i];
+      const slot = document.createElement('div');
+      const filledClass = id ? 'filled ' + country : 'empty';
+      slot.className = 'slot ' + filledClass;
+      slot.innerHTML = `
+        <div class="num">${i + 1}</div>
+        ${id ? renderContestantCell(id) : '<div class="name">—</div>'}
+      `;
+      grid.appendChild(slot);
     }
-  }
 
-  /* ===== EMPEZAR section ===== */
-  function renderEmpezar() {
-    if (!serverState) return;
-    const cuba = serverState.countries.cuba;
-    const pr   = serverState.countries.pr;
-    const bothReady = cuba.teamLocked && pr.teamLocked;
-    const showStarted = serverState.showStarted;
-
-    if (showStarted) {
-      $('empezar-section').classList.add('hidden');
-      $('show-running').classList.remove('hidden');
-      renderShowRunning();
+    // Stage status text
+    const statusEl = $(`${country}-status`);
+    if (c?.ready) {
+      statusEl.innerHTML = `<span style="color:#5fea9f;">✓ LISTO PARA EL SHOW</span>`;
+    } else if (c?.teamLocked) {
+      statusEl.innerHTML = `8/8 elegidos · esperando "ESTOY LISTO"`;
     } else {
-      $('empezar-section').classList.remove('hidden');
-      $('show-running').classList.add('hidden');
-      $('empezar-section').classList.toggle('disabled', !bothReady);
-      $('btn-empezar').disabled = !bothReady;
-      $('empezar-status').textContent = bothReady
-        ? '✓ Los dos paises tienen sus 8 lockeados. Listo para arrancar.'
-        : `Esperando: ${cuba.teamLocked ? '' : 'Cuba '}${pr.teamLocked ? '' : 'Puerto Rico '}`;
+      const passed = c?.counts?.passed || 0;
+      statusEl.innerHTML = `${passed}/8 pasados — siguen las eliminaciones`;
     }
   }
 
-  $('btn-empezar').addEventListener('click', async () => {
-    const shuffle = $('shuffle-pairings').checked;
+  function renderContestantCell(id) {
+    const cs = serverState?.contestants;
+    const c = cs && cs[id];
+    if (c) {
+      return `<div class="name">${escapeHtml(c.name)}</div>${c.bio ? `<div class="ig">${escapeHtml(c.bio)}</div>` : ''}`;
+    }
+    // No tenemos contestants poblado pre-show. El nombre vendria del lockedTeam ID.
+    // Para mostrar el nombre real pre-show, necesitamos pedirlo al server.
+    // Por ahora mostramos un placeholder que el WS update reemplazara cuando
+    // el contestants este populado (al EMPEZAR show).
+    return `<div class="name">FINALISTA</div><div class="ig">${id.slice(0, 6)}</div>`;
+  }
+
+  /* ===== Ready buttons ===== */
+  function renderReady() {
+    const cuba = serverState?.countries?.cuba;
+    const pr   = serverState?.countries?.pr;
+    const myRole = session?.role;
+
+    const btnCuba = $('ready-cuba');
+    const btnPr   = $('ready-pr');
+
+    // Cuba button
+    const cubaCanReady = !!cuba?.teamLocked;
+    const cubaIsReady  = !!cuba?.ready;
+    const cubaIsMine   = myRole === 'cuba' || (myRole === 'master');
+    btnCuba.disabled = !cubaCanReady || !cubaIsMine;
+    btnCuba.classList.toggle('is-ready', cubaIsReady);
+    btnCuba.querySelector('.ready-main').textContent = cubaIsReady ? '✓ CUBA LISTO' : 'ESTOY LISTO';
+
+    // PR button
+    const prCanReady = !!pr?.teamLocked;
+    const prIsReady  = !!pr?.ready;
+    const prIsMine   = myRole === 'pr' || (myRole === 'master');
+    btnPr.disabled = !prCanReady || !prIsMine;
+    btnPr.classList.toggle('is-ready', prIsReady);
+    btnPr.querySelector('.ready-main').textContent = prIsReady ? '✓ PR LISTO' : 'ESTOY LISTO';
+
+    // Status helper
+    const statusEl = $('ready-status');
+    if (cubaIsReady && prIsReady) {
+      statusEl.innerHTML = `<span style="color: var(--gold);">¡VAMOS! Arrancando bracket…</span>`;
+    } else if (!cuba?.teamLocked && !pr?.teamLocked) {
+      statusEl.innerHTML = `Cada streamer cierra sus 8 desde su panel y después confirma acá.`;
+    } else if (cuba?.teamLocked && !pr?.teamLocked) {
+      statusEl.innerHTML = `Cuba lista. Esperando que PR cierre los suyos.`;
+    } else if (!cuba?.teamLocked && pr?.teamLocked) {
+      statusEl.innerHTML = `PR lista. Esperando que Cuba cierre los suyos.`;
+    } else if (cubaIsReady && !prIsReady) {
+      statusEl.innerHTML = `Cuba dijo listo. Esperando confirmación de PR.`;
+    } else if (!cubaIsReady && prIsReady) {
+      statusEl.innerHTML = `PR dijo listo. Esperando confirmación de Cuba.`;
+    } else {
+      statusEl.innerHTML = `Los dos lados con 8 elegidos. Click "ESTOY LISTO" cuando estés listo.`;
+    }
+  }
+
+  $('ready-cuba').addEventListener('click', () => proposeReady('cuba'));
+  $('ready-pr').addEventListener('click', () => proposeReady('pr'));
+
+  async function proposeReady(country) {
+    const current = !!serverState?.countries?.[country]?.ready;
     try {
-      await api('/api/master/start-show', { shuffle });
-      toast('🏆 ¡Show empezado!');
+      const r = await api(`/api/admin/${country}/ready`, { ready: !current });
+      if (r.showStarted) toast('🏆 Show empezando');
+      else toast(r.ready ? `${country.toUpperCase()} listo` : `${country.toUpperCase()} cancelado`);
     } catch (e) { toast(e.message); }
-  });
+  }
 
   /* ===== Show running ===== */
   function renderShowRunning() {
-    renderBracketList();
-    renderActiveMatch();
+    const running = !!serverState?.showStarted;
+    $('stage-pre-show').classList.toggle('hidden', running);
+    $('stage-show-running').classList.toggle('hidden', !running);
   }
 
-  function renderBracketList() {
-    const root = $('bracket-list');
-    root.innerHTML = '';
-    const bracket = serverState?.bracket;
-    if (!bracket) {
-      root.innerHTML = '<p class="text-muted">No hay bracket.</p>';
-      return;
-    }
-    const cs = serverState.contestants || {};
-    const roundNames = ['Octofinales', 'Cuartos', 'Semifinales', 'FINAL'];
-    bracket.rounds.forEach((round, ri) => {
-      const sec = document.createElement('div');
-      sec.className = 'round-section';
-      sec.innerHTML = `<h4>${roundNames[ri]}</h4>`;
-      round.forEach(m => {
-        const btn = document.createElement('button');
-        btn.className = 'match-btn';
-        if (m.status === 'active') btn.classList.add('active');
-        if (m.status === 'done')   btn.classList.add('done');
-        if (m.id === selectedMatchId) btn.classList.add('active');
-        const a = cs[m.leftId], b = cs[m.rightId];
-        const aName = a?.name || (m.leftId ? '?' : 'TBD');
-        const bName = b?.name || (m.rightId ? '?' : 'TBD');
-        btn.innerHTML = `
-          <span>${m.wing === 'center' ? '★' : (m.wing === 'left' ? '◀' : '▶')}</span>
-          <span>${escapeHtml(aName)}</span>
-          <span class="vs">vs</span>
-          <span>${escapeHtml(bName)}</span>
-          ${m.status === 'done' ? `<span class="winner-tag">${escapeHtml(cs[m.winnerId]?.name || '')}</span>` : ''}
-        `;
-        btn.addEventListener('click', () => {
-          selectedMatchId = m.id;
-          renderShowRunning();
-        });
-        sec.appendChild(btn);
-      });
-      root.appendChild(sec);
-    });
-  }
-
-  function findMatch(matchId) {
-    if (!serverState?.bracket) return null;
-    for (const round of serverState.bracket.rounds) {
-      const m = round.find(x => x.id === matchId);
-      if (m) return m;
-    }
-    return null;
-  }
-
-  function renderActiveMatch() {
-    const m = selectedMatchId ? findMatch(selectedMatchId) : null;
-    const cur = serverState?.currentMatch;
-    const isCurrent = m && cur && cur.matchId === m.id;
-    const inPreview = isCurrent && cur.phase === 'preview';
-    const inVoting  = isCurrent && cur.phase === 'voting';
-    const inResult  = isCurrent && cur.phase === 'result';
-    const matchReady = !!(m && m.leftId && m.rightId && m.status !== 'done');
-    const cs = serverState?.contestants || {};
-
-    if (!m) {
-      $('active-match-title').textContent = 'Sin match activo';
-      $('active-match-info').textContent = 'Seleccioná un match del bracket.';
-    } else {
-      const a = cs[m.leftId], b = cs[m.rightId];
-      const phase = isCurrent ? cur.phase : (m.status === 'done' ? 'CERRADO' : 'IDLE');
-      $('active-match-title').textContent = `${a?.name || '?'} vs ${b?.name || '?'}`;
-      $('active-match-info').innerHTML = `
-        <strong>${a?.country === 'cuba' ? 'CUBA' : 'PR'}</strong> vs <strong>${b?.country === 'cuba' ? 'CUBA' : 'PR'}</strong>
-        · Fase: <strong>${phase.toUpperCase()}</strong>
-      `;
-    }
-
-    $('ctl-preview').disabled    = !matchReady || isCurrent;
-    $('ctl-clip-left').disabled  = !inPreview;
-    $('ctl-clip-right').disabled = !inPreview;
-    $('ctl-pause-clips').disabled= !inPreview;
-    $('ctl-vote-start').disabled = !inPreview;
-    $('ctl-vote-end').disabled   = !inVoting;
-
-    // Consenso pendiente
-    const pd = serverState?.pendingDecision;
-    const cb = $('consensus-box');
-    if (pd && m && pd.matchId === m.id) {
-      cb.innerHTML = `
-        <div style="font-size:1rem; letter-spacing:2px; margin-bottom:6px;">CONSENSO 2-DE-2</div>
-        <div class="vote-line"><span>Cuba:</span> <strong>${pd.votes.cuba ? pd.votes.cuba.toUpperCase() : '— pendiente —'}</strong></div>
-        <div class="vote-line"><span>PR:</span>   <strong>${pd.votes.pr   ? pd.votes.pr.toUpperCase()   : '— pendiente —'}</strong></div>
-        ${pd.votes.cuba && pd.votes.pr && pd.votes.cuba !== pd.votes.pr ? '<div style="color:var(--pr); margin-top:4px;">⚠ Discrepancia. Alguien tiene que cambiar.</div>' : ''}
-      `;
-      cb.classList.remove('hidden');
-      $('ctl-cancel-decision').disabled = false;
-    } else {
-      cb.classList.add('hidden');
-      $('ctl-cancel-decision').disabled = true;
-    }
-  }
-
-  /* ===== Bracket controls ===== */
-  $('ctl-preview').addEventListener('click', async () => {
-    if (!selectedMatchId) return;
-    try { await api('/api/match/preview', { matchId: selectedMatchId }); toast('Preview ✓'); }
-    catch (e) { toast(e.message); }
-  });
-  $('ctl-clip-left').addEventListener('click', () => api('/api/match/play-clip', { side: 'left',  action: 'play' }).catch(e => toast(e.message)));
-  $('ctl-clip-right').addEventListener('click', () => api('/api/match/play-clip', { side: 'right', action: 'play' }).catch(e => toast(e.message)));
-  $('ctl-pause-clips').addEventListener('click', async () => {
-    try {
-      await api('/api/match/play-clip', { side: 'left',  action: 'pause' });
-      await api('/api/match/play-clip', { side: 'right', action: 'pause' });
-    } catch (e) { toast(e.message); }
-  });
-  $('ctl-vote-start').addEventListener('click', async () => {
-    const sec = parseInt($('ctl-duration').value, 10) || 60;
-    try { await api('/api/match/voting/start', { durationMs: sec * 1000 }); toast('Votación abierta'); }
-    catch (e) { toast(e.message); }
-  });
-  $('ctl-vote-end').addEventListener('click', async () => {
-    try { await api('/api/match/voting/end', {}); toast('Votación cerrada'); }
-    catch (e) { toast(e.message); }
-  });
-  $('ctl-cancel-decision').addEventListener('click', async () => {
-    try { await api('/api/match/cancel-decision', {}); toast('Voto cancelado'); }
-    catch (e) { toast(e.message); }
-  });
-
-  /* ===== Reset ===== */
-  let resetShowArmed = false, resetAllArmed = false;
-  $('btn-reset-show').addEventListener('click', async () => {
-    if (!resetShowArmed) {
-      resetShowArmed = true;
-      $('btn-reset-show').textContent = '¿SEGURO? click otra vez';
-      setTimeout(() => { resetShowArmed = false; $('btn-reset-show').textContent = 'Resetear show (preserva submissions)'; }, 3000);
-      return;
-    }
-    try { await api('/api/master/reset-show', {}); toast('Show reseteado'); resetShowArmed = false; $('btn-reset-show').textContent = 'Resetear show (preserva submissions)'; }
-    catch (e) { toast(e.message); }
-  });
-  $('btn-reset-all').addEventListener('click', async () => {
-    if (!resetAllArmed) {
-      resetAllArmed = true;
-      $('btn-reset-all').textContent = '⚠ BORRA TODO. Click de nuevo.';
-      setTimeout(() => { resetAllArmed = false; $('btn-reset-all').textContent = 'RESET TOTAL (borra todo)'; }, 4000);
-      return;
-    }
-    try { await api('/api/master/reset-all', {}); toast('Todo borrado'); resetAllArmed = false; $('btn-reset-all').textContent = 'RESET TOTAL (borra todo)'; }
-    catch (e) { toast(e.message); }
-  });
-
-  /* ===== Render orchestrator ===== */
+  /* ===== Render ===== */
   function renderAll() {
     if (!serverState) return;
-    renderTwitch();
-    renderCountryStatus();
-    renderEmpezar();
+    renderSlots('cuba');
+    renderSlots('pr');
+    renderReady();
+    renderShowRunning();
   }
 
-  /* ===== Helpers ===== */
   function escapeHtml(s) {
     return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }

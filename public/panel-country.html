@@ -10,248 +10,460 @@
   <link rel="stylesheet" href="/css/common.css" />
   <style>
     body { padding-bottom: 32px; }
-    .panel-body { max-width: 1280px; margin: 0 auto; padding: 18px 20px; position: relative; z-index: 1; }
+    .panel-body { max-width: 1280px; margin: 0 auto; padding: 22px 20px; position: relative; z-index: 1; }
 
-    /* Submission list (pending/approved/rejected) */
-    .sub-list { display: grid; gap: 8px; }
+    /* Twitch widget en header */
+    .twitch-widget {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 7px 14px;
+      border: 1px solid var(--glass-border-strong);
+      border-radius: 100px;
+      background: var(--glass);
+      color: var(--text);
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .72rem; letter-spacing: 1.5px;
+      cursor: pointer;
+      transition: var(--transition);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .twitch-widget:hover { background: var(--glass-strong); border-color: var(--glass-border); }
+    .twitch-dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: rgba(255,255,255, .25);
+    }
+    .twitch-widget.live .twitch-dot { background: #2dd47a; box-shadow: 0 0 10px #2dd47a; }
+    .twitch-widget.live { color: #5fea9f; border-color: rgba(45, 212, 122, .55); }
+
+    /* Screens (one visible at a time) */
+    .screen { display: none; animation: fadeIn .35s ease-out; }
+    .screen.active { display: block; }
+
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: transparent; border: none;
+      color: var(--muted); font-family: 'Archivo Black', sans-serif;
+      font-size: .85rem; letter-spacing: 1px;
+      cursor: pointer; margin-bottom: 16px;
+      padding: 8px 0;
+    }
+    .back-btn:hover { color: var(--text); }
+
+    /* Menu cards */
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 32px 0 24px;
+    }
+    .menu-card {
+      position: relative;
+      background: var(--glass-strong);
+      border: 1px solid var(--glass-border-strong);
+      border-radius: var(--radius-xl);
+      padding: 28px 24px;
+      cursor: pointer;
+      text-align: left;
+      transition: var(--transition);
+      color: var(--text);
+      backdrop-filter: blur(20px) saturate(140%);
+      -webkit-backdrop-filter: blur(20px) saturate(140%);
+      overflow: hidden;
+      box-shadow: var(--shadow-1);
+    }
+    .menu-card::before {
+      content: '';
+      position: absolute; inset: -1px;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(155deg, rgba(255,255,255,.22) 0%, rgba(255,255,255,.04) 50%, rgba(255,255,255,.16) 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude;
+      pointer-events: none;
+    }
+    .menu-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-2); }
+    .menu-card:active { transform: translateY(1px); }
+    .menu-card .icon {
+      font-size: 2.6rem;
+      margin-bottom: 10px;
+      display: inline-block;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,.4));
+    }
+    .menu-card .title {
+      font-family: 'Bangers', cursive;
+      font-size: 1.6rem; letter-spacing: 2px;
+      margin-bottom: 4px;
+    }
+    .menu-card .sub {
+      color: var(--muted); font-size: .88rem;
+    }
+    .menu-card .badge-count {
+      position: absolute;
+      top: 24px; right: 24px;
+      min-width: 32px; height: 32px;
+      padding: 0 8px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 100px;
+      background: var(--gold-grad);
+      color: var(--ink);
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .85rem;
+      box-shadow: 0 4px 12px var(--gold-glow);
+    }
+    .menu-card.pink   .icon { color: #ff6db5; }
+    .menu-card.violet .icon { color: #b06bff; }
+    .menu-card.blue   .icon { color: var(--cuba-300); }
+    .menu-card.disabled {
+      opacity: .55; cursor: not-allowed; transform: none;
+    }
+    .menu-card.disabled:hover { transform: none; box-shadow: var(--shadow-1); }
+
+    .menu-status {
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .85rem; letter-spacing: 1px;
+      color: var(--text-soft);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .menu-status .stat-chips {
+      display: flex; gap: 8px; flex-wrap: wrap;
+    }
+    .menu-status .stat-chip {
+      background: var(--glass-strong);
+      padding: 4px 12px; border-radius: 100px;
+      border: 1px solid var(--glass-border);
+      font-size: .8rem;
+    }
+
+    /* Queue (submissions list) */
+    .screen-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 16px; flex-wrap: wrap; gap: 12px;
+    }
+    .screen-header h2 {
+      font-family: 'Bangers', cursive; font-size: 2.2rem; letter-spacing: 2px;
+      background: var(--gold-grad);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin: 0;
+    }
+    .filter-tabs {
+      display: flex; gap: 4px; flex-wrap: wrap;
+      background: var(--glass);
+      padding: 4px;
+      border-radius: 100px;
+      border: 1px solid var(--glass-border);
+    }
+    .filter-tabs button {
+      background: transparent; border: none;
+      color: var(--muted);
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .78rem; letter-spacing: 1px;
+      padding: 7px 14px;
+      border-radius: 100px;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .filter-tabs button.active {
+      background: var(--gold-grad); color: var(--ink);
+      box-shadow: 0 4px 14px var(--gold-glow);
+    }
+    .filter-tabs button .num {
+      background: rgba(0,0,0,.18); padding: 0 6px; border-radius: 100px; margin-left: 4px;
+    }
+
+    .sub-list { display: grid; gap: 10px; }
     .sub-item {
       display: grid;
       grid-template-columns: auto 1fr auto;
-      gap: 12px; align-items: center;
-      background: white; color: var(--ink);
-      border: 3px solid var(--ink);
-      border-radius: 10px;
-      padding: 10px 12px;
-      box-shadow: var(--shadow-sm);
+      gap: 14px; align-items: center;
+      background: var(--glass-strong);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
     .sub-item .num {
       font-family: 'Archivo Black', sans-serif;
       width: 32px; height: 32px;
       display: grid; place-items: center;
-      background: var(--accent-yellow);
-      border: 2px solid var(--ink);
-      border-radius: 6px;
+      background: var(--gold-grad); color: var(--ink);
+      border-radius: 8px;
+      font-size: .85rem;
     }
     .sub-item .meta { min-width: 0; }
     .sub-item .meta .name {
       font-family: 'Archivo Black', sans-serif;
-      font-size: 1rem; letter-spacing: 1px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-size: 1rem; letter-spacing: .5px;
     }
-    .sub-item .meta .ig { font-size: .8rem; color: #666; }
+    .sub-item .meta .ig { font-size: .78rem; color: var(--muted); }
     .sub-item .meta .url {
       display: block;
-      font-family: 'Inter', monospace; font-size: .75rem;
-      color: var(--cuba); text-decoration: none;
+      font-family: 'Inter', monospace; font-size: .72rem;
+      color: var(--cuba-300); text-decoration: none;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      max-width: 360px;
+      max-width: 380px;
     }
     .sub-item .actions { display: flex; gap: 6px; }
-    .sub-item .actions button { padding: 6px 10px; font-size: .8rem; }
-    .sub-item .badge { white-space: nowrap; }
-    .sub-empty { color: var(--paper-2); text-align: center; padding: 30px; font-style: italic; }
+    .sub-item .actions .btn { padding: 7px 12px; font-size: .78rem; }
 
-    /* Phase 1 grid */
+    /* Phase 1 grid (eliminacion en vivo) */
     .p1-toolbar {
-      display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-      margin-bottom: 12px;
+      display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+      margin-bottom: 16px;
     }
     .p1-counter {
       font-family: 'Archivo Black', sans-serif;
-      background: var(--gold-grad);
-      color: var(--ink);
-      border: 1px solid rgba(255, 209, 74, .55);
+      background: var(--gold-grad); color: var(--ink);
       border-radius: 100px;
       padding: 8px 18px;
       box-shadow: 0 4px 14px var(--gold-glow);
-      letter-spacing: 1.3px;
-      font-size: .85rem;
+      letter-spacing: 1.2px;
+      font-size: .88rem;
     }
-    .p1-counter strong { font-size: 1.3rem; margin: 0 2px; }
+    .p1-counter strong { font-size: 1.2rem; margin: 0 2px; }
     .p1-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
     }
     .p1-card {
-      background: white; color: var(--ink);
-      border: 3px solid var(--ink);
-      border-radius: 10px;
-      padding: 10px;
+      background: var(--glass-strong);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      padding: 14px;
       cursor: pointer;
-      box-shadow: var(--shadow-sm);
-      transition: transform .12s;
+      transition: var(--transition);
       position: relative;
-      min-height: 100px;
+      min-height: 110px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
-    .p1-card:hover { transform: translate(-2px, -2px); }
-    .p1-card.passed   { background: #d6f5e3; border-color: #2dd47a; }
-    .p1-card.rejected { background: #f0f0f0; opacity: .55; }
+    .p1-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+    .p1-card.passed {
+      background: linear-gradient(155deg, rgba(45,234,159, .26) 0%, rgba(45,234,159, .08) 100%);
+      border-color: rgba(45, 234, 159, .55);
+      box-shadow: 0 4px 16px rgba(45, 212, 122, .25);
+    }
+    .p1-card.rejected { opacity: .35; filter: grayscale(.6); }
     .p1-card.active-vote {
-      background: var(--accent-yellow);
-      outline: 4px solid var(--ink);
-      outline-offset: 2px;
+      background: var(--gold-grad);
+      color: var(--ink);
+      border-color: var(--gold);
+      box-shadow: 0 6px 20px var(--gold-glow);
     }
     .p1-card .num {
-      position: absolute; top: 6px; right: 8px;
+      position: absolute; top: 8px; right: 10px;
       font-family: 'Archivo Black', sans-serif;
-      background: var(--ink); color: var(--accent-yellow);
-      padding: 2px 8px; border-radius: 4px;
-      font-size: .75rem;
+      background: rgba(0,0,0,.35); color: var(--gold);
+      padding: 2px 8px; border-radius: 100px;
+      font-size: .7rem;
     }
+    .p1-card.active-vote .num { background: var(--ink); color: var(--gold); }
     .p1-card .name {
       font-family: 'Archivo Black', sans-serif;
-      font-size: 1rem; letter-spacing: .5px;
+      font-size: .98rem; letter-spacing: .5px;
       margin-bottom: 4px;
       padding-right: 36px;
     }
-    .p1-card .ig { font-size: .8rem; color: #666; margin-bottom: 6px; }
+    .p1-card .ig { font-size: .78rem; color: var(--muted); margin-bottom: 8px; }
+    .p1-card.active-vote .ig { color: rgba(26, 18, 48, .65); }
     .p1-card .decision {
       font-family: 'Archivo Black', sans-serif;
-      font-size: .75rem; letter-spacing: 1.5px;
+      font-size: .72rem; letter-spacing: 1px;
+      margin-top: 6px;
     }
 
-    /* Phase 1 modal */
+    /* Modal */
     .p1-modal {
       position: fixed; inset: 0; z-index: 50;
       display: grid; place-items: center;
-      background: rgba(0,0,0,.6);
-      backdrop-filter: blur(4px);
+      background: rgba(0, 0, 0, .65);
+      backdrop-filter: blur(6px);
+      animation: fadeIn .25s;
     }
     .p1-modal-inner {
-      background: var(--paper);
+      background: linear-gradient(160deg, var(--paper-warm) 0%, var(--paper) 100%);
       color: var(--ink);
-      border: 6px solid var(--ink);
-      border-radius: 18px;
-      box-shadow: var(--shadow);
-      padding: 24px;
-      width: min(620px, 94vw);
+      border: 1px solid rgba(26, 18, 48, .15);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-pop);
+      padding: 28px;
+      width: min(640px, 94vw);
       max-height: 90vh;
       overflow: auto;
     }
     .p1-modal-inner h3 {
       font-family: 'Bangers', cursive;
-      font-size: 2rem; letter-spacing: 2px;
+      font-size: 2.2rem; letter-spacing: 2px;
       margin: 0 0 4px;
     }
-    .p1-modal-meta { color: #666; font-size: .9rem; margin-bottom: 14px; }
+    .p1-modal-meta { color: rgba(26,18,48,.65); font-size: .9rem; margin-bottom: 16px; }
     .p1-modal-link {
       display: block;
-      background: white; border: 3px solid var(--ink); border-radius: 8px;
-      padding: 8px 12px;
-      font-family: monospace; font-size: .75rem;
-      color: var(--cuba); text-decoration: none;
+      background: white; border: 1px solid rgba(26,18,48,.15); border-radius: var(--radius);
+      padding: 10px 14px;
+      font-family: monospace; font-size: .78rem;
+      color: var(--cuba-700); text-decoration: none;
       word-break: break-all;
-      margin-bottom: 16px;
+      margin-bottom: 18px;
     }
+    .p1-poll-controls {
+      display: flex; gap: 8px; align-items: center; margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .p1-poll-controls .input { width: 80px; padding: 8px 10px; font-size: .9rem; background: white; color: var(--ink); border-color: rgba(26,18,48,.2); }
+    .p1-poll-controls .btn { padding: 9px 14px; font-size: .82rem; }
     .p1-poll {
       background: white;
-      border: 3px solid var(--ink);
-      border-radius: 12px;
+      border: 1px solid rgba(26, 18, 48, .15);
+      border-radius: var(--radius);
       padding: 14px;
-      margin-bottom: 16px;
+      margin-bottom: 18px;
     }
     .p1-poll .timer {
       font-family: 'Bangers', cursive;
-      font-size: 1.6rem; letter-spacing: 2px;
+      font-size: 1.7rem; letter-spacing: 2px;
       text-align: center;
       margin-bottom: 8px;
     }
     .p1-poll .meter {
-      display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center;
-      margin-bottom: 6px;
+      display: grid; grid-template-columns: 56px 1fr 50px; gap: 10px; align-items: center;
+      margin-bottom: 8px;
     }
     .p1-poll .meter .label {
       font-family: 'Archivo Black', sans-serif;
-      width: 56px; text-align: center; padding: 4px 6px;
-      border: 2px solid var(--ink); border-radius: 4px;
+      width: 56px; text-align: center; padding: 5px 6px;
+      border-radius: 8px;
+      font-size: .8rem; letter-spacing: 1px;
     }
-    .p1-poll .meter .label.si { background: #2dd47a; color: var(--ink); }
-    .p1-poll .meter .label.no { background: var(--pr); color: white; }
+    .p1-poll .meter .label.si { background: linear-gradient(155deg, #5fea9f 0%, #2dd47a 100%); color: var(--ink); }
+    .p1-poll .meter .label.no { background: var(--pr-grad); color: white; }
     .p1-poll .meter .bar {
-      background: #eee; height: 18px; border: 2px solid var(--ink); border-radius: 4px; overflow: hidden;
+      background: rgba(26,18,48,.10);
+      border-radius: 100px; height: 14px; overflow: hidden;
     }
-    .p1-poll .meter .bar > div { height: 100%; transition: width .4s; }
-    .p1-poll .meter .bar .b-si { background: #2dd47a; }
-    .p1-poll .meter .bar .b-no { background: var(--pr); }
+    .p1-poll .meter .bar > div { height: 100%; transition: width .4s; border-radius: inherit; }
+    .p1-poll .meter .bar .b-si { background: linear-gradient(90deg, #5fea9f 0%, #2dd47a 100%); }
+    .p1-poll .meter .bar .b-no { background: linear-gradient(90deg, #ff7c8d 0%, #d11d2d 100%); }
     .p1-poll .meter .count {
       font-family: 'Archivo Black', sans-serif;
-      width: 40px; text-align: right;
+      text-align: right; font-size: .9rem;
     }
     .p1-decide {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
     }
-    .p1-decide .btn { padding: 14px; font-size: 1rem; }
-    .p1-poll-controls {
-      display: flex; gap: 8px; align-items: center; margin-bottom: 10px;
+    .p1-decide .btn { padding: 16px; font-size: 1rem; }
+    .p1-modal-close {
+      width: 100%; margin-top: 12px;
+      background: transparent; color: rgba(26,18,48,.6);
     }
-    .p1-poll-controls input { width: 80px; }
 
-    /* Equipo final tab */
+    /* Manual screen (pick 8 from approved) */
     .team-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 10px; margin-bottom: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
     }
     .team-card {
-      background: white; color: var(--ink);
-      border: 3px solid var(--ink);
-      border-radius: 10px;
-      padding: 10px;
+      background: var(--glass-strong);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      padding: 14px;
       cursor: pointer;
-      box-shadow: var(--shadow-sm);
       position: relative;
+      transition: var(--transition);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
     .team-card.selected {
-      background: var(--accent-yellow);
-      outline: 4px solid var(--ink);
-      outline-offset: 2px;
+      background: var(--gold-grad);
+      color: var(--ink);
+      border-color: var(--gold);
+      box-shadow: 0 6px 20px var(--gold-glow);
     }
-    .team-card.locked-bg { background: #d6f5e3; cursor: default; }
     .team-card .check {
-      position: absolute; top: 6px; right: 6px;
-      width: 24px; height: 24px;
-      border: 2px solid var(--ink); border-radius: 50%;
-      background: white;
+      position: absolute; top: 8px; right: 10px;
+      width: 28px; height: 28px;
+      border: 2px solid var(--glass-border-strong); border-radius: 50%;
       display: grid; place-items: center;
       font-family: 'Archivo Black', sans-serif;
+      background: var(--glass);
+      transition: var(--transition);
     }
-    .team-card.selected .check { background: var(--ink); color: var(--accent-yellow); }
+    .team-card.selected .check {
+      background: var(--ink); color: var(--gold);
+      border-color: var(--ink);
+    }
+    .team-card .name {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .98rem; padding-right: 36px;
+    }
+    .team-card .ig { font-size: .78rem; color: var(--muted); margin-top: 4px; }
+    .team-card.selected .ig { color: rgba(26,18,48,.65); }
 
-    /* During show */
-    .live-show-panel {
-      background: rgba(255,216,74,.08);
-      border: 4px dashed var(--accent-yellow);
-      border-radius: 12px;
-      padding: 16px;
-      color: var(--paper);
+    /* Closed screen (8 finalistas lockeados) */
+    .closed-banner {
+      text-align: center; padding: 30px 20px;
+      background: linear-gradient(155deg, rgba(45,234,159, .22) 0%, rgba(45,234,159, .06) 100%);
+      border: 1px solid rgba(45, 234, 159, .35);
+      border-radius: var(--radius-xl);
+      margin-bottom: 24px;
+      box-shadow: 0 0 50px rgba(45, 212, 122, .14);
     }
-    .consensus-status {
-      background: white; color: var(--ink);
-      border: 3px solid var(--ink);
-      border-radius: 10px;
-      padding: 12px;
-      margin-bottom: 12px;
+    .closed-banner h2 {
+      font-size: 3rem;
+      background: linear-gradient(155deg, #5fea9f 0%, #2dd47a 100%);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 18px rgba(45, 212, 122, .45));
+      margin-bottom: 8px;
     }
-    .consensus-status .vote-line {
-      display: flex; justify-content: space-between;
-      padding: 4px 0;
+    .closed-banner p { color: var(--text-soft); margin-bottom: 16px; }
+    .closed-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 10px; margin-top: 10px;
     }
+    .closed-item {
+      background: var(--glass-strong);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      text-align: left;
+    }
+    .closed-item .num {
+      font-family: 'Archivo Black', sans-serif;
+      color: var(--gold); font-size: .7rem;
+    }
+    .closed-item .name {
+      font-family: 'Bangers', cursive;
+      font-size: 1.2rem; letter-spacing: 1px;
+    }
+    .closed-item .ig { font-size: .75rem; color: var(--muted); }
   </style>
 </head>
 <body>
 <div class="halftone-bg"></div>
 
-<!-- ===== Login (PIN gate) ===== -->
+<!-- ===== Login ===== -->
 <section id="login-screen" class="login-screen">
   <div class="login-card">
     <h2 id="login-title">PANEL</h2>
-    <p id="login-sub">Ingresá el PIN del show.</p>
+    <p id="login-sub">Ingresá el PIN.</p>
     <form id="login-form" style="display:grid; gap:10px; margin-top:14px;">
       <input class="input input-pin" type="password" id="pin" placeholder="PIN" autocomplete="off" />
       <button type="submit" class="btn btn-yellow btn-big">ENTRAR</button>
     </form>
-    <p class="error-msg" id="login-error" style="color:#d12; min-height:1.2em; margin-top:6px;"></p>
+    <p class="error-msg" id="login-error"></p>
   </div>
 </section>
 
@@ -260,104 +472,111 @@
   <header class="panel-header">
     <h1 id="panel-title">PANEL</h1>
     <div style="display:flex; gap:10px; align-items:center;">
+      <button id="twitch-widget" class="twitch-widget">
+        <span class="twitch-dot"></span>
+        <span id="twitch-label">CONECTAR TWITCH</span>
+      </button>
       <span id="role-tag" class="role-tag role-cuba">CUBA</span>
-      <button id="btn-logout" class="btn btn-ghost" style="font-size:.8rem; padding:6px 12px;">Salir</button>
+      <button id="btn-logout" class="btn btn-ghost btn-sm">Salir</button>
     </div>
   </header>
 
   <main class="panel-body">
 
-    <!-- Status banner -->
-    <div id="status-banner" class="card" style="background: rgba(255,255,255,.06); border-color: var(--paper-2); color: white; padding: 14px 16px; margin-bottom: 16px;">
-      <div class="row gap-md" style="justify-content: space-between;">
-        <div class="row gap-sm">
-          <span class="badge" id="b-open">—</span>
-          <span class="badge" id="b-locked">—</span>
-          <span style="font-family:'Archivo Black',sans-serif; font-size:.85rem;">
-            Inscripciones: <span id="b-count">0</span>/<span id="b-cap">50</span>
-          </span>
-          <span style="font-family:'Archivo Black',sans-serif; font-size:.85rem;">
-            Pasaron fase 1: <span id="b-passed">0</span>/8
-          </span>
+    <!-- ===== Screen: Menu (3 cards principales) ===== -->
+    <section id="screen-menu" class="screen active">
+      <div class="title-wrap" style="margin: 16px 0 0;">
+        <div class="title-kicker">¿Qué querés hacer?</div>
+      </div>
+
+      <div class="menu-grid">
+        <button class="menu-card pink" data-go="queue">
+          <span class="icon">📥</span>
+          <div class="badge-count" id="menu-pending-count">0</div>
+          <div class="title">VER ENVIADOS</div>
+          <div class="sub">Cola de moderación pública (aprobar / rechazar)</div>
+        </button>
+
+        <button class="menu-card violet" data-go="manual">
+          <span class="icon">✏️</span>
+          <div class="title">CREAR MANUAL</div>
+          <div class="sub">Elegir 8 a pulso desde las aprobadas</div>
+        </button>
+
+        <button class="menu-card blue" data-go="elim">
+          <span class="icon">▶</span>
+          <div class="title">EMPEZAR</div>
+          <div class="sub">Lanzar fase 1: card a card con votación de chat</div>
+        </button>
+      </div>
+
+      <div class="menu-status">
+        <div class="stat-chips">
+          <span class="stat-chip">Inscripciones: <strong id="m-total">0</strong>/<span id="m-cap">50</span></span>
+          <span class="stat-chip">Pendientes: <strong id="m-pending">0</strong></span>
+          <span class="stat-chip">Aprobadas: <strong id="m-approved">0</strong></span>
+          <span class="stat-chip">Rechazadas: <strong id="m-rejected">0</strong></span>
+          <span class="stat-chip">Pasaron: <strong id="m-passed">0</strong>/8</span>
+          <span class="stat-chip" id="m-locked-chip"><strong id="m-locked">no</strong> cerrado</span>
         </div>
-        <div class="row gap-sm">
-          <button id="btn-toggle-submissions" class="btn" style="font-size:.8rem;">—</button>
+        <div style="margin-top:12px;">
+          <button id="m-toggle-subs" class="btn btn-ghost btn-sm">—</button>
         </div>
       </div>
-    </div>
-
-    <nav class="tabs">
-      <button class="tab-btn active" data-tab="pending">Pendientes <span id="tag-pending" class="badge badge-yellow" style="margin-left:4px;">0</span></button>
-      <button class="tab-btn" data-tab="approved">Aprobadas <span id="tag-approved" class="badge badge-green" style="margin-left:4px;">0</span></button>
-      <button class="tab-btn" data-tab="rejected">Rechazadas <span id="tag-rejected" class="badge badge-gray" style="margin-left:4px;">0</span></button>
-      <button class="tab-btn" data-tab="elim">Eliminación</button>
-      <button class="tab-btn" data-tab="team">Equipo final</button>
-      <button class="tab-btn hidden" data-tab="live" id="tab-live">Show en vivo</button>
-    </nav>
-
-    <!-- Tab: Pendientes -->
-    <section class="tab-panel active" data-panel="pending">
-      <div class="sub-list" id="list-pending"></div>
     </section>
 
-    <!-- Tab: Aprobadas -->
-    <section class="tab-panel" data-panel="approved">
-      <div class="sub-list" id="list-approved"></div>
-    </section>
-
-    <!-- Tab: Rechazadas -->
-    <section class="tab-panel" data-panel="rejected">
-      <div class="sub-list" id="list-rejected"></div>
-    </section>
-
-    <!-- Tab: Eliminación -->
-    <section class="tab-panel" data-panel="elim">
-      <div class="p1-toolbar">
-        <div class="p1-counter">PASARON: <strong><span id="p1-passed-count">0</span></strong>/8</div>
-        <span class="text-muted" style="font-size:.85rem;">Click una card para abrirla y que vote el chat (SI/NO).</span>
+    <!-- ===== Screen: Queue (submissions moderation) ===== -->
+    <section id="screen-queue" class="screen">
+      <button class="back-btn" data-back>← Menú</button>
+      <div class="screen-header">
+        <h2>📥 ENVIADOS</h2>
+        <div class="filter-tabs">
+          <button data-filter="pending" class="active">Pendientes <span class="num" id="f-pending">0</span></button>
+          <button data-filter="approved">Aprobadas <span class="num" id="f-approved">0</span></button>
+          <button data-filter="rejected">Rechazadas <span class="num" id="f-rejected">0</span></button>
+        </div>
       </div>
+      <div class="sub-list" id="queue-list"></div>
+    </section>
+
+    <!-- ===== Screen: Manual (pick 8 from approved) ===== -->
+    <section id="screen-manual" class="screen">
+      <button class="back-btn" data-back>← Menú</button>
+      <div class="screen-header">
+        <h2>✏️ ELEGIR 8 A PULSO</h2>
+        <span class="p1-counter">SELECCIONADOS: <strong id="manual-count">0</strong>/8</span>
+      </div>
+      <p style="color: var(--muted); margin-bottom: 14px;">Tildá 8 cantantes aprobados para tu equipo final. Si querés usar la votación del chat, volvé al menú y elegí "EMPEZAR".</p>
+      <div class="team-grid" id="manual-grid"></div>
+      <div style="display:flex; gap: 10px;">
+        <button id="manual-lock" class="btn btn-success btn-big">CERRAR EQUIPO</button>
+      </div>
+    </section>
+
+    <!-- ===== Screen: Eliminación (phase 1) ===== -->
+    <section id="screen-elim" class="screen">
+      <button class="back-btn" data-back>← Menú</button>
+      <div class="screen-header">
+        <h2>▶ ELIMINACIÓN EN VIVO</h2>
+        <span class="p1-counter">PASARON: <strong id="elim-count">0</strong>/8</span>
+      </div>
+      <p style="color: var(--muted); margin-bottom: 16px;">Click una card → modal con votación SI/NO en el chat → decidís PASA o NO PASA. Cuando "PASARON" llegue a 8, podés cerrar el equipo.</p>
       <div class="p1-grid" id="p1-grid"></div>
-    </section>
-
-    <!-- Tab: Equipo final -->
-    <section class="tab-panel" data-panel="team">
-      <p class="text-muted" style="margin-bottom: 12px;">
-        Elegí los 8 finalistas (clickear cards). Si ya hiciste eliminación con chat, los que pasaron están preseleccionados.
-      </p>
-      <div class="team-grid" id="team-grid"></div>
-      <div class="row gap-md" style="margin-top: 18px;">
-        <button id="btn-lock"   class="btn btn-yellow btn-big">CERRAR EQUIPO (8/8)</button>
-        <button id="btn-unlock" class="btn btn-ghost hidden">Desbloquear</button>
+      <div style="display:flex; gap: 10px; margin-top: 18px;">
+        <button id="elim-lock" class="btn btn-success btn-big" disabled>CERRAR LOS 8 PASADOS</button>
       </div>
     </section>
 
-    <!-- Tab: Show en vivo (visible solo cuando showStarted=true) -->
-    <section class="tab-panel" data-panel="live">
-      <div class="live-show-panel">
-        <h2 style="color: var(--accent-yellow); font-size: 1.6rem; margin-bottom: 8px;">SHOW EN VIVO</h2>
-        <p>Tu rol durante el bracket: votar la decisión de cada match. El otro lado tiene que votar lo mismo para que se cierre. Las otras acciones (preview, abrir votación, clips) las puede hacer cualquier rol.</p>
-
-        <div id="live-current-match" style="margin-top:14px;"></div>
-
-        <div id="consensus-status" class="consensus-status hidden"></div>
-
-        <div class="row gap-md" style="margin-top:14px;">
-          <button id="ctl-preview"      class="btn btn-cuba" disabled>1. PREVIEW</button>
-          <button id="ctl-clip-left"    class="btn btn-cuba" disabled>▶ Clip izq</button>
-          <button id="ctl-clip-right"   class="btn btn-pr"   disabled>▶ Clip der</button>
-          <button id="ctl-pause-clips"  class="btn btn-ghost" disabled>⏸ Pausa</button>
-        </div>
-        <div class="row gap-md" style="margin-top:8px;">
-          <label style="font-family:'Archivo Black',sans-serif;">Voto (s):</label>
-          <input id="ctl-duration" type="number" min="10" max="300" value="60" class="input" style="width:80px; padding:6px 8px;" />
-          <button id="ctl-vote-start"  class="btn btn-yellow" disabled>2. ABRIR VOTACIÓN</button>
-          <button id="ctl-vote-end"    class="btn btn-ghost"  disabled>Cerrar votación</button>
-        </div>
-        <div class="row gap-md" style="margin-top:14px;">
-          <button id="ctl-decide-left"  class="btn btn-cuba" disabled>3. Mi voto: GANA IZQ</button>
-          <button id="ctl-decide-right" class="btn btn-pr"   disabled>3. Mi voto: GANA DER</button>
-          <button id="ctl-decide-cancel" class="btn btn-ghost" disabled>Cancelar votación</button>
-        </div>
+    <!-- ===== Screen: Closed (8 finalistas lockeados) ===== -->
+    <section id="screen-closed" class="screen">
+      <div class="closed-banner">
+        <h2>✓ EQUIPO CERRADO</h2>
+        <p>Los 8 finalistas de tu lado están guardados. Andá a <a href="/panel/master" style="color: var(--gold);">/panel/master</a> y dale "ESTOY LISTO". Cuando el otro lado también esté listo, arranca el bracket.</p>
+        <div class="closed-list" id="closed-list"></div>
+      </div>
+      <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+        <a href="/panel/master" class="btn btn-yellow btn-big">→ IR A MASTER</a>
+        <button id="closed-unlock" class="btn btn-ghost">Desbloquear (volver a editar)</button>
       </div>
     </section>
 
@@ -372,13 +591,13 @@
     <a id="modal-link" class="p1-modal-link" target="_blank" rel="noopener">—</a>
 
     <div class="p1-poll-controls">
-      <label style="font-family:'Archivo Black',sans-serif;font-size:.85rem;">Voto (s):</label>
+      <label class="font-strong" style="font-size:.78rem; letter-spacing:1px;">Voto (s):</label>
       <input id="modal-duration" class="input" type="number" min="10" max="300" value="60" />
       <button id="modal-poll-start" class="btn btn-yellow">Abrir votación</button>
       <button id="modal-poll-end"   class="btn btn-ghost">Cerrar</button>
     </div>
 
-    <div class="p1-poll" id="modal-poll-block">
+    <div class="p1-poll">
       <div class="timer" id="modal-timer">--</div>
       <div class="meter">
         <span class="label si">SI</span>
@@ -397,7 +616,7 @@
       <button class="btn btn-danger"  data-decide="rejected">✗ NO PASA</button>
     </div>
 
-    <button id="modal-close" class="btn btn-ghost" style="margin-top:10px; width:100%;">Cerrar sin decidir</button>
+    <button id="modal-close" class="btn btn-ghost p1-modal-close">Cerrar sin decidir</button>
   </div>
 </div>
 
