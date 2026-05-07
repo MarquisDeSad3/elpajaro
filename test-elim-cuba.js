@@ -11,27 +11,31 @@ const BASE = process.env.BASE || 'https://elpajaro.onrender.com';
 const PIN_CUBA = process.env.PIN_CUBA || '090809';
 const PIN_PR   = process.env.PIN_PR   || '872346';
 
+// IDs de videos REALES de YouTube (verificados que existen) — random mix de
+// musica latina/popular para que cuando el user abra un modal, el clip
+// suene de verdad. NO necesariamente son las canciones reales de los
+// artistas nombrados — es solo demo data.
 const CUBANOS = [
-  { name: 'Bebeshito',         ig: 'bebeshito_oficial',   url: 'https://www.youtube.com/watch?v=8U5N5sk0WlQ' },
-  { name: 'Chocolate MC',      ig: 'chocolatemc_oficial', url: 'https://www.youtube.com/watch?v=zvCBSSwgtg4' },
-  { name: 'El Taiger',         ig: 'eltaiger_oficial',    url: 'https://www.youtube.com/watch?v=7q-7iz1L9C4' },
-  { name: 'Yomil y El Dany',   ig: 'yomilyeldany',        url: 'https://www.youtube.com/watch?v=6c-cWKbwQpU' },
-  { name: 'Charly y Manuel',   ig: 'charlymanuel',        url: 'https://www.youtube.com/watch?v=7N8Aru1MAuc' },
-  { name: 'El Chacal',         ig: 'elchacal_oficial',    url: 'https://www.youtube.com/watch?v=z9j4i3Vy9nU' },
-  { name: 'El Micha',          ig: 'elmicha',             url: 'https://www.youtube.com/watch?v=v6mOuk-S6tg' },
-  { name: 'Wampi',             ig: 'wampi_oficial',       url: 'https://www.youtube.com/watch?v=DmbFUBwYBV4' },
-  { name: 'Insurrecto',        ig: 'insurrecto',          url: 'https://www.youtube.com/watch?v=7xkSJ7VtsCg' },
-  { name: 'La Diosa',          ig: 'ladiosaofficial',     url: 'https://www.youtube.com/watch?v=Wa1nUlwPBr0' },
-  { name: 'La Reina y la Real',ig: 'lareinaylareal',      url: 'https://www.youtube.com/watch?v=z0PWQAxGTDU' },
-  { name: 'Wow Popy',          ig: 'wowpopy',             url: 'https://www.youtube.com/watch?v=XL7Pdx2_QDY' },
-  { name: 'El Kimiko y Yordy', ig: 'kimikoyyordy',        url: 'https://www.youtube.com/watch?v=8DQH9GUC8Tg' },
-  { name: 'Lenier Mesa',       ig: 'leniermesa',          url: 'https://www.youtube.com/watch?v=LRUyQJlBFmA' },
-  { name: 'Cimafunk',          ig: 'cimafunk',            url: 'https://www.youtube.com/watch?v=qoq6Tl4MSwU' },
-  { name: 'El Negrito',        ig: 'elnegritopalante',    url: 'https://www.youtube.com/watch?v=0EAXWmmczZE' },
-  { name: 'Manu Manu',         ig: 'manumanuflow',        url: 'https://www.youtube.com/watch?v=2vV4WGTvpSE' },
-  { name: 'El Príncipe',       ig: 'elprincipecuba',      url: 'https://www.youtube.com/watch?v=Q2qZTI60dCU' },
-  { name: 'Damian',            ig: 'damianoficial',       url: 'https://www.youtube.com/watch?v=l1z3zQTmqU8' },
-  { name: 'Robe L. Ninja',     ig: 'robelninja',          url: 'https://www.youtube.com/watch?v=4xDzrJKXOOY' },
+  { name: 'Bebeshito',         ig: 'bebeshito_oficial',   url: 'https://www.youtube.com/watch?v=kJQP7kiw5Fk' },  // Despacito
+  { name: 'Chocolate MC',      ig: 'chocolatemc_oficial', url: 'https://www.youtube.com/watch?v=Cr8K88UcO5s' },  // Tití Me Preguntó
+  { name: 'El Taiger',         ig: 'eltaiger_oficial',    url: 'https://www.youtube.com/watch?v=eRcox9Snpps' },  // Daddy Yankee Gasolina
+  { name: 'Yomil y El Dany',   ig: 'yomilyeldany',        url: 'https://www.youtube.com/watch?v=KAwyWkksXuo' },  // Daddy Yankee
+  { name: 'Charly y Manuel',   ig: 'charlymanuel',        url: 'https://www.youtube.com/watch?v=7N8Aru1MAuc' },  // El Taxi (real)
+  { name: 'El Chacal',         ig: 'elchacal_oficial',    url: 'https://www.youtube.com/watch?v=tg00YEETFzg' },
+  { name: 'El Micha',          ig: 'elmicha',             url: 'https://www.youtube.com/watch?v=oG1D_o6BGI0' },
+  { name: 'Wampi',             ig: 'wampi_oficial',       url: 'https://www.youtube.com/watch?v=Tt6x2qKlwXE' },
+  { name: 'Insurrecto',        ig: 'insurrecto',          url: 'https://www.youtube.com/watch?v=DyDfgMOUjCI' },
+  { name: 'La Diosa',          ig: 'ladiosaofficial',     url: 'https://www.youtube.com/watch?v=tT9Eh8wNMkw' },
+  { name: 'La Reina y la Real',ig: 'lareinaylareal',      url: 'https://www.youtube.com/watch?v=VZkwHwTeCPg' },
+  { name: 'Wow Popy',          ig: 'wowpopy',             url: 'https://www.youtube.com/watch?v=fb-j4Nt1cT0' },
+  { name: 'El Kimiko y Yordy', ig: 'kimikoyyordy',        url: 'https://www.youtube.com/watch?v=B6_iQvaIjXw' },
+  { name: 'Lenier Mesa',       ig: 'leniermesa',          url: 'https://www.youtube.com/watch?v=q0hyYWKXF0Q' },
+  { name: 'Cimafunk',          ig: 'cimafunk',            url: 'https://www.youtube.com/watch?v=wlYx1JUS6ts' },
+  { name: 'El Negrito',        ig: 'elnegritopalante',    url: 'https://www.youtube.com/watch?v=pRpeEdMmmQ0' },
+  { name: 'Manu Manu',         ig: 'manumanuflow',        url: 'https://www.youtube.com/watch?v=fHI8X4OXluQ' },
+  { name: 'El Príncipe',       ig: 'elprincipecuba',      url: 'https://www.youtube.com/watch?v=6Ejga4kJUts' },
+  { name: 'Damian',            ig: 'damianoficial',       url: 'https://www.youtube.com/watch?v=PT2_F-1esPk' },
+  { name: 'Robe L. Ninja',     ig: 'robelninja',          url: 'https://www.youtube.com/watch?v=hT_nvWreIhg' },
 ];
 
 async function api(path, body, token, headers = {}) {
