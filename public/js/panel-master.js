@@ -944,8 +944,7 @@
       // Champion: todas las rondas done despues de no estarlo
       if (curR === -1 && prevR !== -1) {
         const champ = cur.contestants?.[cur.bracket.championId];
-        const name = champ?.name ? champ.name.toUpperCase() : '';
-        playRoundTransition('¡CAMPEÓN!', name, { variant: 'champion' });
+        if (champ) playChampionScreen(champ);
       }
       // Avance de ronda: prev en N, ahora en N+1+
       else if (curR > prevR && prevR >= 0 && curR < ROUND_TITLES.length) {
@@ -982,6 +981,61 @@
     `;
     document.body.appendChild(overlay);
     setTimeout(() => overlay.remove(), 4300);
+  }
+
+  /**
+   * Pantalla de CAMPEÓN — extension de playRoundTransition con miniatura,
+   * @ instagram, badge de pais. Mas larga (9s) y mas adornada.
+   */
+  function playChampionScreen(champ) {
+    playRoundFanfare();
+    // Segunda fanfare 1.5s despues para extender la celebracion
+    setTimeout(() => playRoundFanfare(), 1400);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'round-transition champion';
+
+    // Doble cantidad de sparks (24) con mayor dispersion para celebracion
+    let sparks = '';
+    for (let i = 0; i < 24; i++) {
+      const angle = (i / 24) * Math.PI * 2;
+      const dist = 280 + Math.random() * 220;
+      const dx = Math.cos(angle) * dist;
+      const dy = Math.sin(angle) * dist;
+      const delay = Math.random() * 0.6;
+      sparks += `<div class="rt-spark" style="--dx:${dx}px;--dy:${dy}px;animation-delay:${delay}s;"></div>`;
+    }
+
+    // Datos del contestant. bio tiene el "@xxx" precargado en startShow,
+    // sino fallback a c.instagram con prefijo manual.
+    const name    = champ?.name ? champ.name.toUpperCase() : 'CAMPEÓN';
+    const igText  = champ?.bio || (champ?.instagram ? '@' + champ.instagram : '');
+    const country = champ?.country === 'cuba' ? 'CUBA'
+                  : champ?.country === 'pr'   ? 'PUERTO RICO'
+                  : '';
+    const countryClass = champ?.country || '';
+
+    // Thumbnail: priorizar clipThumbnail (oEmbed/YouTube/Vimeo), fallback a iframe
+    // generado on-the-fly seria muy pesado para un overlay full-screen — mejor
+    // omitir si no hay thumb. (En el 95% de los casos hay thumb porque el flujo
+    // de submissions ya intenta noembed.com como fallback.)
+    const thumbImg = champ?.clipThumbnail
+      ? `<img class="champ-thumb" src="${escapeHtml(champ.clipThumbnail)}" alt="" onerror="this.style.display='none'">`
+      : '';
+
+    overlay.innerHTML = `
+      <div class="rt-content">
+        ${sparks}
+        <div class="champ-crown">🏆</div>
+        <div class="rt-text">¡CAMPEÓN!</div>
+        ${thumbImg}
+        <div class="champ-name">${escapeHtml(name)}</div>
+        ${igText ? `<div class="champ-ig">${escapeHtml(igText)}</div>` : ''}
+        ${country ? `<div class="champ-country ${countryClass}">${escapeHtml(country)}</div>` : ''}
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    setTimeout(() => overlay.remove(), 9100);
   }
 
   /**
