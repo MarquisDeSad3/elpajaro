@@ -289,6 +289,131 @@
       font-family: 'Archivo Black', sans-serif; letter-spacing: 1px;
       text-decoration: none;
     }
+
+    /* === Panel de votacion (solo visible durante phase=voting) === */
+    .vote-panel {
+      margin-top: 14px;
+      padding: 14px 16px;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      position: relative;
+      overflow: hidden;
+    }
+    .vote-panel.hidden { display: none; }
+
+    /* Timer countdown encima del panel */
+    .vote-timer {
+      display: flex; align-items: center; gap: 10px;
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .75rem; letter-spacing: 2px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .vote-timer-bar {
+      flex: 1; height: 6px;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px; overflow: hidden;
+    }
+    .vote-timer-fill {
+      height: 100%;
+      background: var(--gold-grad);
+      transition: width .2s linear;
+      box-shadow: 0 0 8px var(--gold-glow);
+    }
+    .vote-timer-text { color: var(--gold); min-width: 36px; text-align: right; }
+
+    /* Barras stacked: cada lado tiene un track con cuba+pr stacked dentro */
+    .vote-bars {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      align-items: stretch;
+    }
+    .vote-bar-side {
+      display: flex; flex-direction: column; gap: 6px;
+      min-width: 0;
+    }
+    .vote-bar-head {
+      display: flex; justify-content: space-between; align-items: baseline;
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .72rem; letter-spacing: 1.5px;
+    }
+    .vote-bar-head .label { color: var(--muted); }
+    .vote-bar-head .total { color: var(--text); font-size: 1rem; }
+    .vote-bar-wrap {
+      width: 100%; height: 22px;
+      background: rgba(0,0,0,.35);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      overflow: hidden;
+      display: flex;
+    }
+    .vote-bar-wrap > div {
+      height: 100%;
+      transition: width .25s ease-out;
+    }
+    .vote-bar-cuba {
+      background: linear-gradient(90deg, rgba(45,169,255,.4) 0%, var(--cuba) 100%);
+      box-shadow: inset 0 0 12px rgba(108,193,255,.5);
+    }
+    .vote-bar-pr {
+      background: linear-gradient(90deg, rgba(255,61,87,.4) 0%, var(--pr) 100%);
+      box-shadow: inset 0 0 12px rgba(255,124,141,.5);
+    }
+    .vote-breakdown {
+      display: flex; gap: 10px; font-size: .68rem; color: var(--muted);
+      font-family: 'Archivo Black', sans-serif; letter-spacing: 1px;
+    }
+    .vote-breakdown .pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px;
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      background: var(--glass);
+    }
+    .vote-breakdown .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      box-shadow: 0 0 6px currentColor;
+    }
+    .vote-breakdown .dot.cuba { background: var(--cuba); color: var(--cuba); }
+    .vote-breakdown .dot.pr   { background: var(--pr);   color: var(--pr); }
+
+    /* Lluvia de nombres flotantes — quien voto por quien */
+    .vote-rain {
+      position: absolute; inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .vote-rain .name {
+      position: absolute;
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .72rem; letter-spacing: 1px;
+      padding: 3px 8px;
+      border-radius: 100px;
+      color: white;
+      box-shadow: 0 4px 14px rgba(0,0,0,.4);
+      animation: voteFloat 2.6s ease-out forwards;
+      white-space: nowrap;
+      max-width: 140px;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .vote-rain .name.cuba {
+      background: linear-gradient(135deg, rgba(45,169,255,.95) 0%, rgba(0,143,255,.85) 100%);
+      border: 1px solid var(--cuba-300);
+    }
+    .vote-rain .name.pr {
+      background: linear-gradient(135deg, rgba(255,61,87,.95) 0%, rgba(220,40,60,.85) 100%);
+      border: 1px solid var(--pr-300);
+    }
+    @keyframes voteFloat {
+      0%   { opacity: 0; transform: translateY(20px) scale(.7); }
+      15%  { opacity: 1; transform: translateY(0) scale(1.05); }
+      85%  { opacity: 1; transform: translateY(-30px) scale(1); }
+      100% { opacity: 0; transform: translateY(-60px) scale(.9); }
+    }
+
     .active-vs-mark {
       align-self: center;
       font-family: 'Bangers', cursive;
@@ -454,6 +579,47 @@
             </div>
             <div class="embed-wrap" id="active-right-embed"></div>
           </div>
+        </div>
+
+        <!-- Panel de votacion en vivo (visible solo durante phase=voting) -->
+        <div id="vote-panel" class="vote-panel hidden">
+          <div class="vote-timer">
+            <span>TIEMPO</span>
+            <div class="vote-timer-bar"><div class="vote-timer-fill" id="vote-timer-fill" style="width:100%"></div></div>
+            <span class="vote-timer-text" id="vote-timer-text">—</span>
+          </div>
+          <div class="vote-bars">
+            <div class="vote-bar-side">
+              <div class="vote-bar-head">
+                <span class="label" id="vote-left-label">IZQUIERDA</span>
+                <span class="total"><span id="vote-left-total">0</span></span>
+              </div>
+              <div class="vote-bar-wrap" id="vote-left-bar">
+                <div class="vote-bar-cuba" style="width:0%"></div>
+                <div class="vote-bar-pr"   style="width:0%"></div>
+              </div>
+              <div class="vote-breakdown">
+                <span class="pill"><span class="dot cuba"></span>CUBA <span id="vote-left-cuba">0</span></span>
+                <span class="pill"><span class="dot pr"></span>PR <span id="vote-left-pr">0</span></span>
+              </div>
+            </div>
+            <div class="vote-bar-side">
+              <div class="vote-bar-head">
+                <span class="label" id="vote-right-label">DERECHA</span>
+                <span class="total"><span id="vote-right-total">0</span></span>
+              </div>
+              <div class="vote-bar-wrap" id="vote-right-bar">
+                <div class="vote-bar-cuba" style="width:0%"></div>
+                <div class="vote-bar-pr"   style="width:0%"></div>
+              </div>
+              <div class="vote-breakdown">
+                <span class="pill"><span class="dot cuba"></span>CUBA <span id="vote-right-cuba">0</span></span>
+                <span class="pill"><span class="dot pr"></span>PR <span id="vote-right-pr">0</span></span>
+              </div>
+            </div>
+          </div>
+          <!-- Lluvia de nombres de Twitch (quien voto por quien) -->
+          <div class="vote-rain" id="vote-rain"></div>
         </div>
 
         <div class="active-actions">

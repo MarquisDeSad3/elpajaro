@@ -238,8 +238,9 @@
     setContestant('left', left);
     setContestant('right', right);
 
-    // Voto bars
-    if (pollState && pollState.matchId === m.id) {
+    // Voto bars — el snapshot del voting expone `targetId` (no `matchId`).
+    // Bug previo: comparabamos contra .matchId y siempre fallaba → reset.
+    if (pollState && pollState.targetId === m.id) {
       updateBars(pollState);
     } else {
       resetBars();

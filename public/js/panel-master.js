@@ -34,6 +34,8 @@
   let savedPin = localStorage.getItem(PIN_KEY) || null;
   let session = null;       // { role: 'cuba'|'pr'|'master' } o null en publico
   let serverState = null;
+  let pollState = null;     // ultimo snapshot del voting activo (o null)
+  let voteTimerInterval = null;
 
   // Customizar la pantalla de login segun el targetRole
   if (targetRole) {
@@ -60,7 +62,18 @@
     ws.onerror = () => {};
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
-      if (m.type === 'state') { serverState = m.state; renderAll(); }
+      if (m.type === 'state') {
+        serverState = m.state;
+        renderAll();
+      } else if (m.type === 'voting-start' || m.type === 'voting-update' || m.type === 'voting-end') {
+        pollState = m.poll;
+        renderVotePanel();
+        if (m.lastVote) addFloatingVote(m.lastVote);
+        if (m.type === 'voting-end') {
+          // Cerrar timer cuando termina el poll
+          stopVoteTimer();
+        }
+      }
     };
   }
 
@@ -634,6 +647,112 @@
     }
   });
 
+  /* ===== Vote panel — barras + nombres flotantes + timer =====
+   * Solo visible durante phase=voting del match activo. Escucha los
+   * 3 eventos del WS: voting-start, voting-update (con lastVote para
+   * la lluvia de nombres), y voting-end. */
+  function renderVotePanel() {
+    const panel = $('vote-panel');
+    if (!panel) return;
+    const cur = serverState?.currentMatch;
+    const visible = !!(cur && cur.phase === 'voting' && pollState
+                        && pollState.targetId === cur.matchId
+                        && !pollState.ended);
+    panel.classList.toggle('hidden', !visible);
+    if (!visible) {
+      stopVoteTimer();
+      return;
+    }
+
+    // Labels con nombres reales del match (CUBA: Wow Popy / PR: Tego)
+    const match = findMatchById(cur.matchId);
+    const cs = serverState?.contestants || {};
+    const left  = match ? cs[match.leftId]  : null;
+    const right = match ? cs[match.rightId] : null;
+    $('vote-left-label').textContent  = (left?.name  || 'IZQUIERDA').toUpperCase();
+    $('vote-right-label').textContent = (right?.name || 'DERECHA').toUpperCase();
+
+    // Barras + conteos
+    updateBars(pollState);
+
+    // Timer countdown
+    if (cur.startedAt && cur.deadlineAt) {
+      startVoteTimer(cur.startedAt, cur.deadlineAt);
+    }
+  }
+
+  function updateBars(poll) {
+    if (!poll || !poll.totals || !poll.votes) return;
+    const t = poll.totals;
+    const grand = Math.max(1, t.grandTotal);
+
+    const leftBar  = $('vote-left-bar');
+    const rightBar = $('vote-right-bar');
+    if (leftBar) {
+      const cubaW = (poll.votes.cuba.left / grand * 100).toFixed(1);
+      const prW   = (poll.votes.pr.left   / grand * 100).toFixed(1);
+      leftBar.querySelector('.vote-bar-cuba').style.width = cubaW + '%';
+      leftBar.querySelector('.vote-bar-pr').style.width   = prW + '%';
+    }
+    if (rightBar) {
+      const cubaW = (poll.votes.cuba.right / grand * 100).toFixed(1);
+      const prW   = (poll.votes.pr.right   / grand * 100).toFixed(1);
+      rightBar.querySelector('.vote-bar-cuba').style.width = cubaW + '%';
+      rightBar.querySelector('.vote-bar-pr').style.width   = prW + '%';
+    }
+    $('vote-left-cuba').textContent  = poll.votes.cuba.left;
+    $('vote-left-pr').textContent    = poll.votes.pr.left;
+    $('vote-left-total').textContent = t.leftTotal;
+    $('vote-right-cuba').textContent = poll.votes.cuba.right;
+    $('vote-right-pr').textContent   = poll.votes.pr.right;
+    $('vote-right-total').textContent= t.rightTotal;
+  }
+
+  function startVoteTimer(startedAt, deadlineAt) {
+    stopVoteTimer();
+    const total = deadlineAt - startedAt;
+    if (total <= 0) return;
+    const fill = $('vote-timer-fill');
+    const text = $('vote-timer-text');
+    const tick = () => {
+      const remaining = Math.max(0, deadlineAt - Date.now());
+      const pct = Math.max(0, Math.min(100, (remaining / total) * 100));
+      if (fill) fill.style.width = pct + '%';
+      if (text) text.textContent = Math.ceil(remaining / 1000) + 's';
+      if (remaining <= 0) stopVoteTimer();
+    };
+    tick();
+    voteTimerInterval = setInterval(tick, 200);
+  }
+
+  function stopVoteTimer() {
+    if (voteTimerInterval) { clearInterval(voteTimerInterval); voteTimerInterval = null; }
+  }
+
+  /**
+   * Lluvia de nombres: cada vez que llega un voto del chat, aparece un
+   * pillon flotante con el username + color del canal de origen (cuba/pr),
+   * en el lado correspondiente al voto (left/right). Animacion 2.6s y se
+   * autodestruye.
+   */
+  function addFloatingVote(vote) {
+    const rain = $('vote-rain');
+    if (!rain || !vote || vote.user == null) return;
+    // Solo mostrar si el panel esta visible (sino vamos llenando DOM al pedo)
+    const panel = $('vote-panel');
+    if (panel.classList.contains('hidden')) return;
+
+    const el = document.createElement('span');
+    el.className = 'name ' + (vote.origin === 'cuba' ? 'cuba' : 'pr');
+    el.textContent = vote.user;
+    // Posicion horizontal segun side (left/right del match)
+    const xBase = vote.side === 'left' ? 12 : 64;
+    el.style.left = (xBase + Math.random() * 16) + '%';
+    el.style.bottom = (8 + Math.random() * 60) + '%';
+    rain.appendChild(el);
+    setTimeout(() => el.remove(), 2700);
+  }
+
   /* ===== Render ===== */
   function renderAll() {
     if (!serverState) return;
@@ -641,6 +760,7 @@
     renderSlots('pr');
     renderReady();
     renderShowRunning();
+    renderVotePanel();
   }
 
   function escapeHtml(s) {
