@@ -73,6 +73,10 @@
           // Cerrar timer cuando termina el poll
           stopVoteTimer();
         }
+      } else if (m.type === 'match-no-votes') {
+        // El backend cerro el voto pero no llego ningun voto del chat —
+        // el match quedo en idle de nuevo. Mostrar toast bien visible.
+        toast('⚠️ ' + (m.message || 'Voto cerrado sin votos. Reabrir.'), 6000);
       }
     };
   }

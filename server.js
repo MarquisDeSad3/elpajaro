@@ -575,23 +575,50 @@ app.post('/api/match/confirm', (req, res) => {
 });
 
 /**
+/**
  * Cierra la votacion del match y elige al ganador por mayoria del chat.
- * En empate, gana left (arbitrario, marcado en logs).
+ *
+ * Reglas:
+ *   - Hay mayoria clara → gana ese lado, recordHistory con autoDecidedByChat=true
+ *   - 0 votos del chat (totals.grandTotal === 0) → NO auto-decidir. Vuelve
+ *     el match a fase 'idle' y broadcast un toast de error visible al master.
+ *     Esto evita el bug "vote 2 → tie 0=0 → wins left por default".
+ *   - Empate con votos (3 vs 3, etc.) → tira un coin flip y loguea, pero
+ *     el match SI se decide (no tiene sentido reabrir indefinidamente).
  */
 function autoDecideByChat(matchId) {
   const poll = voting.getActive() || {};
-  const totals = poll.totals || { leftTotal: 0, rightTotal: 0 };
+  const totals = poll.totals || { leftTotal: 0, rightTotal: 0, grandTotal: 0 };
   voting.endNow();
+
+  console.log(`[MATCH] ${matchId} cerrando voto: L=${totals.leftTotal} R=${totals.rightTotal} grand=${totals.grandTotal}`);
+
+  // Caso: 0 votos. NO decidir, devolver el match a idle para reabrir voto.
+  if (!totals.grandTotal || (totals.leftTotal === 0 && totals.rightTotal === 0)) {
+    console.warn(`[MATCH] ${matchId} cerrado SIN VOTOS — devolviendo a idle. Verificar Twitch IRC.`);
+    stateMod.setCurrentMatch(matchId, 'idle');
+    // Avisar al panel master via WS — el handler dispara un toast visible.
+    wsBus.broadcast({
+      type: 'match-no-votes',
+      matchId,
+      message: 'Voto cerrado SIN VOTOS del chat. Revisá que Twitch esté conectado y reabrí el voto.',
+    });
+    return;
+  }
+
   let winnerSide = 'left';
   if (totals.rightTotal > totals.leftTotal) winnerSide = 'right';
   if (totals.leftTotal === totals.rightTotal) {
-    console.log('[MATCH]', matchId, 'tie', totals, '→ left wins by default');
+    // Empate con votos (no 0-0): coin flip aleatorio en lugar de "left default"
+    winnerSide = Math.random() < 0.5 ? 'left' : 'right';
+    console.log(`[MATCH] ${matchId} tie real ${totals.leftTotal}=${totals.rightTotal} → coin flip → ${winnerSide}`);
   }
   const out = bracketMod.decideMatch(stateMod.state.bracket, matchId, winnerSide);
   if (!out.ok) {
     console.error('[MATCH] decideMatch failed:', out.error);
     return;
   }
+  console.log(`[MATCH] ${matchId} decided: winnerSide=${winnerSide} winnerId=${out.match.winnerId}`);
   stateMod.recordHistory({
     matchId, winnerId: out.match.winnerId, decidedAt: out.match.decidedAt,
     autoDecidedByChat: true, votes: totals,
