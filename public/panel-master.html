@@ -251,7 +251,43 @@
       border-radius: var(--radius);
       padding: 12px;
       min-width: 0;
+      position: relative;
     }
+    /* Badge gigante "1" (azul) o "2" (rojo) — el chat ve esto y sabe que escribir */
+    .vote-badge {
+      position: absolute;
+      top: -14px; right: -14px;
+      width: 70px; height: 70px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Bangers', cursive;
+      font-size: 3.6rem; line-height: 1;
+      border-radius: 50%;
+      border: 4px solid var(--ink);
+      box-shadow: 0 6px 22px rgba(0,0,0,.5), 0 0 30px currentColor;
+      z-index: 5;
+      transform: rotate(-8deg);
+      animation: votePulse 2s ease-in-out infinite;
+    }
+    .vote-badge.left  { background: linear-gradient(155deg, #4dc3ff 0%, #1e7fff 100%); color: #87d8ff; }
+    .vote-badge.right { background: linear-gradient(155deg, #ff5570 0%, #d22442 100%); color: #ff8a9b; }
+    .vote-badge .num {
+      color: white;
+      text-shadow: 0 3px 0 var(--ink), 0 5px 10px rgba(0,0,0,.5);
+    }
+    @keyframes votePulse {
+      0%, 100% { transform: rotate(-8deg) scale(1); }
+      50%      { transform: rotate(-8deg) scale(1.07); }
+    }
+    .vote-cta {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .72rem; letter-spacing: 2px;
+      text-align: center;
+      padding: 6px 10px;
+      border-radius: 100px;
+      margin-top: -4px;
+    }
+    .vote-cta.left  { background: rgba(45,169,255,.15); color: #87d8ff; border: 1px solid rgba(45,169,255,.5); }
+    .vote-cta.right { background: rgba(255,61,87,.15);  color: #ff8a9b; border: 1px solid rgba(255,61,87,.5); }
     .active-side .head { display: flex; flex-direction: column; gap: 2px; }
     .active-side .head .country {
       font-family: 'Archivo Black', sans-serif;
@@ -288,6 +324,72 @@
       color: var(--gold);
       font-family: 'Archivo Black', sans-serif; letter-spacing: 1px;
       text-decoration: none;
+    }
+
+    /* === Twitch connection widgets (header) === */
+    .twitch-widgets { display: flex; gap: 8px; }
+    .tw-widget {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 12px;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .68rem; letter-spacing: 1.5px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .tw-widget:hover { border-color: var(--gold); color: var(--text); }
+    .tw-widget.live {
+      background: rgba(45,212,122,.18);
+      border-color: rgba(45,212,122,.55);
+      color: #5fea9f;
+    }
+    .tw-widget.live .tw-dot {
+      background: #2dd47a;
+      box-shadow: 0 0 8px #2dd47a, 0 0 16px rgba(45,212,122,.5);
+      animation: twPulse 1.4s ease-in-out infinite;
+    }
+    .tw-widget.off  .tw-dot {
+      background: #ff5e6e;
+      box-shadow: 0 0 8px #ff5e6e;
+      animation: twPulse 1s ease-in-out infinite;
+    }
+    .tw-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      flex-shrink: 0;
+    }
+    @keyframes twPulse {
+      0%, 100% { opacity: .55; }
+      50%      { opacity: 1; }
+    }
+
+    /* Warning grande cuando entrás a voting sin Twitch conectado */
+    .twitch-warning {
+      background: linear-gradient(135deg, rgba(255,94,110,.25) 0%, rgba(220,40,60,.18) 100%);
+      border: 2px solid #ff5e6e;
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin-bottom: 14px;
+      display: flex; align-items: center; gap: 14px;
+      animation: warnPulse 1.6s ease-in-out infinite;
+    }
+    .twitch-warning.hidden { display: none; }
+    .twitch-warning .icon { font-size: 1.8rem; flex-shrink: 0; }
+    .twitch-warning .msg {
+      flex: 1;
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .82rem; letter-spacing: 1.5px;
+      color: #ffb8c0;
+      line-height: 1.4;
+    }
+    .twitch-warning .msg strong { color: white; }
+    .twitch-warning .actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .twitch-warning .btn { padding: 8px 14px; font-size: .75rem; }
+    @keyframes warnPulse {
+      0%, 100% { box-shadow: 0 0 0 rgba(255,94,110,0); }
+      50%      { box-shadow: 0 0 30px rgba(255,94,110,.4); }
     }
 
     /* === Panel de votacion (solo visible durante phase=voting) === */
@@ -354,14 +456,16 @@
       height: 100%;
       transition: width .25s ease-out;
     }
-    .vote-bar-cuba {
-      background: linear-gradient(90deg, rgba(45,169,255,.4) 0%, var(--cuba) 100%);
-      box-shadow: inset 0 0 12px rgba(108,193,255,.5);
-    }
-    .vote-bar-pr {
-      background: linear-gradient(90deg, rgba(255,61,87,.4) 0%, var(--pr) 100%);
-      box-shadow: inset 0 0 12px rgba(255,124,141,.5);
-    }
+    /* Las 2 capas stacked dentro de cada barra muestran de QUE chat
+       (cuba/pr) llego el voto — la barra entera ya esta posicionada en
+       el lado correcto del match (izq=1 azul / der=2 rojo), entonces el
+       desglose stacked usa tonos del color del lado, no del canal. */
+    .vote-bar-side.left  .vote-bar-cuba { background: linear-gradient(90deg, rgba(108,193,255,.6) 0%, #4dc3ff 100%); }
+    .vote-bar-side.left  .vote-bar-pr   { background: linear-gradient(90deg, rgba(45,169,255,.55) 0%, #1e7fff 100%); border-left: 1px dashed rgba(255,255,255,.25); }
+    .vote-bar-side.right .vote-bar-cuba { background: linear-gradient(90deg, rgba(255,124,141,.6) 0%, #ff5570 100%); }
+    .vote-bar-side.right .vote-bar-pr   { background: linear-gradient(90deg, rgba(255,61,87,.55) 0%, #d22442 100%); border-left: 1px dashed rgba(255,255,255,.25); }
+    .vote-bar-side.left  .vote-bar-wrap { box-shadow: inset 0 0 12px rgba(108,193,255,.3); }
+    .vote-bar-side.right .vote-bar-wrap { box-shadow: inset 0 0 12px rgba(255,124,141,.3); }
     .vote-breakdown {
       display: flex; gap: 10px; font-size: .68rem; color: var(--muted);
       font-family: 'Archivo Black', sans-serif; letter-spacing: 1px;
@@ -515,7 +619,15 @@
 <div id="main-panel" class="hidden">
   <header class="panel-header">
     <h1 style="background: var(--gold-grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">EL PAJARO · MASTER</h1>
-    <div style="display:flex; gap:10px; align-items:center;">
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <div class="twitch-widgets">
+        <button class="tw-widget off" id="tw-cuba" data-side="cuba" title="Conectar chat de Twitch (Cuba)">
+          <span class="tw-dot"></span>CUBA · <span class="tw-status">OFF</span>
+        </button>
+        <button class="tw-widget off" id="tw-pr" data-side="pr" title="Conectar chat de Twitch (PR)">
+          <span class="tw-dot"></span>PR · <span class="tw-status">OFF</span>
+        </button>
+      </div>
       <span class="role-tag role-master">MASTER</span>
       <button id="btn-logout" class="btn btn-ghost btn-sm">Salir</button>
     </div>
@@ -563,21 +675,38 @@
         <span class="phase-tag" id="active-phase-tag">PRÓXIMO MATCH</span>
         <div class="active-vs">
           <div class="active-side">
+            <div class="vote-badge left"><span class="num">1</span></div>
             <div class="head">
               <div class="country" id="active-left-country">—</div>
               <div class="name"    id="active-left-name">—</div>
               <div class="ig"      id="active-left-ig"></div>
             </div>
             <div class="embed-wrap" id="active-left-embed"></div>
+            <div class="vote-cta left">ESCRIBÍ <strong>1</strong> EN EL CHAT</div>
           </div>
           <div class="active-vs-mark">VS</div>
           <div class="active-side">
+            <div class="vote-badge right"><span class="num">2</span></div>
             <div class="head">
               <div class="country" id="active-right-country">—</div>
               <div class="name"    id="active-right-name">—</div>
               <div class="ig"      id="active-right-ig"></div>
             </div>
             <div class="embed-wrap" id="active-right-embed"></div>
+            <div class="vote-cta right">ESCRIBÍ <strong>2</strong> EN EL CHAT</div>
+          </div>
+        </div>
+
+        <!-- Warning si el voting arranco sin Twitch conectado -->
+        <div id="twitch-warning" class="twitch-warning hidden">
+          <div class="icon">⚠️</div>
+          <div class="msg">
+            <strong id="twitch-warning-title">CHAT TWITCH NO CONECTADO</strong><br>
+            <span id="twitch-warning-detail">Sin OAuth, los votos del chat no se cuentan.</span>
+          </div>
+          <div class="actions">
+            <button class="btn btn-cuba btn-sm" id="warn-connect-cuba">CONECTAR CUBA</button>
+            <button class="btn btn-pr btn-sm"   id="warn-connect-pr">CONECTAR PR</button>
           </div>
         </div>
 
@@ -589,9 +718,9 @@
             <span class="vote-timer-text" id="vote-timer-text">—</span>
           </div>
           <div class="vote-bars">
-            <div class="vote-bar-side">
+            <div class="vote-bar-side left">
               <div class="vote-bar-head">
-                <span class="label" id="vote-left-label">IZQUIERDA</span>
+                <span class="label"><span style="color:#4dc3ff;">1 ·</span> <span id="vote-left-label">IZQUIERDA</span></span>
                 <span class="total"><span id="vote-left-total">0</span></span>
               </div>
               <div class="vote-bar-wrap" id="vote-left-bar">
@@ -599,13 +728,13 @@
                 <div class="vote-bar-pr"   style="width:0%"></div>
               </div>
               <div class="vote-breakdown">
-                <span class="pill"><span class="dot cuba"></span>CUBA <span id="vote-left-cuba">0</span></span>
-                <span class="pill"><span class="dot pr"></span>PR <span id="vote-left-pr">0</span></span>
+                <span class="pill"><span class="dot cuba"></span>chat CUBA <span id="vote-left-cuba">0</span></span>
+                <span class="pill"><span class="dot pr"></span>chat PR <span id="vote-left-pr">0</span></span>
               </div>
             </div>
-            <div class="vote-bar-side">
+            <div class="vote-bar-side right">
               <div class="vote-bar-head">
-                <span class="label" id="vote-right-label">DERECHA</span>
+                <span class="label"><span style="color:#ff5570;">2 ·</span> <span id="vote-right-label">DERECHA</span></span>
                 <span class="total"><span id="vote-right-total">0</span></span>
               </div>
               <div class="vote-bar-wrap" id="vote-right-bar">
@@ -613,8 +742,8 @@
                 <div class="vote-bar-pr"   style="width:0%"></div>
               </div>
               <div class="vote-breakdown">
-                <span class="pill"><span class="dot cuba"></span>CUBA <span id="vote-right-cuba">0</span></span>
-                <span class="pill"><span class="dot pr"></span>PR <span id="vote-right-pr">0</span></span>
+                <span class="pill"><span class="dot cuba"></span>chat CUBA <span id="vote-right-cuba">0</span></span>
+                <span class="pill"><span class="dot pr"></span>chat PR <span id="vote-right-pr">0</span></span>
               </div>
             </div>
           </div>

@@ -753,9 +753,69 @@
     setTimeout(() => el.remove(), 2700);
   }
 
+  /* ===== Twitch widgets =====
+   * Cada vez que llega un broadcast del state, refrescamos el dot/label.
+   * Click en el widget abre el OAuth flow en popup (igual que panel-country).
+   * Sin esto, el chat NO llega — el IRC bot se queda dormido. */
+  function renderTwitchWidgets() {
+    const conns = serverState?.twitchConnections || {};
+    for (const side of ['cuba', 'pr']) {
+      const w = $(`tw-${side}`);
+      if (!w) continue;
+      const c = conns[side] || {};
+      w.classList.toggle('live', !!c.connected);
+      w.classList.toggle('off',  !c.connected);
+      const statusEl = w.querySelector('.tw-status');
+      if (statusEl) {
+        statusEl.textContent = c.connected
+          ? (c.name ? c.name.toUpperCase() : 'ON')
+          : 'OFF';
+      }
+    }
+
+    // Warning: si el voting esta activo y algun lado del chat esta off,
+    // mostrar el banner rojo grande con CTAs para conectar.
+    const cur = serverState?.currentMatch;
+    const inVoting = cur && cur.phase === 'voting';
+    const cubaOff = !conns.cuba?.connected;
+    const prOff   = !conns.pr?.connected;
+    const warn = $('twitch-warning');
+    if (!warn) return;
+    if (inVoting && (cubaOff || prOff)) {
+      warn.classList.remove('hidden');
+      const both = cubaOff && prOff;
+      $('twitch-warning-title').textContent = both
+        ? 'AMBOS CHATS DESCONECTADOS'
+        : (cubaOff ? 'CHAT CUBA DESCONECTADO' : 'CHAT PR DESCONECTADO');
+      $('twitch-warning-detail').textContent = both
+        ? 'Ningun voto del chat se esta contando. Conectá los dos para que el bracket funcione.'
+        : 'Los votos de ese canal no se cuentan. Conectalo ya.';
+      // Esconder los botones del lado que SI esta conectado
+      $('warn-connect-cuba').style.display = cubaOff ? '' : 'none';
+      $('warn-connect-pr').style.display   = prOff   ? '' : 'none';
+    } else {
+      warn.classList.add('hidden');
+    }
+  }
+
+  function openTwitchAuth(side) {
+    // El popup hace el OAuth dance y al volver, el server llama a
+    // setTwitchConnection → broadcast → renderTwitchWidgets se actualiza.
+    window.open(`/api/twitch/auth?from=${side}`, 'twitchAuth', 'width=720,height=820');
+  }
+
+  // Click handlers (definidos una vez al cargar)
+  ['cuba', 'pr'].forEach(side => {
+    const btn = $(`tw-${side}`);
+    if (btn) btn.addEventListener('click', () => openTwitchAuth(side));
+    const warnBtn = $(`warn-connect-${side}`);
+    if (warnBtn) warnBtn.addEventListener('click', () => openTwitchAuth(side));
+  });
+
   /* ===== Render ===== */
   function renderAll() {
     if (!serverState) return;
+    renderTwitchWidgets();
     renderSlots('cuba');
     renderSlots('pr');
     renderReady();
