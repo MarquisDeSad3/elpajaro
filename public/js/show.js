@@ -278,18 +278,44 @@
       flag.classList.toggle('flag-cuba', c.country === 'cuba');
       flag.classList.toggle('flag-pr',   c.country === 'pr');
     }
-    // Clip player
+    // Clip player — multi-format
+    //  - iframe: YouTube, Vimeo, TikTok, Spotify, SoundCloud, IG, Drive, etc.
+    //    Play/pause: setear src=autoplayUrl (play) o src='' (pause).
+    //  - video / audio: HTML5 nativo, .play() / .pause() funcionan.
+    //  - link: solo mostrar boton "Abrir link" (no se puede embed).
     const wrap = document.getElementById(`${side}-clip-wrap`);
     if (wrap) {
       wrap.innerHTML = '';
-      if (c.clipUrl) {
-        const tag = c.clipType === 'video' ? 'video' : 'audio';
-        const el = document.createElement(tag);
+      if (!c.clipUrl) return;
+      const kind = c.clipKind || 'link';
+      if (kind === 'iframe') {
+        const iframe = document.createElement('iframe');
+        iframe.src = c.clipEmbed || c.clipUrl;
+        iframe.id = `${side}-clip-el`;
+        iframe.dataset.kind = 'iframe';
+        iframe.dataset.embed = c.clipEmbed || '';
+        iframe.dataset.autoplay = c.clipEmbedAutoplay || '';
+        iframe.allow = 'autoplay; encrypted-media; picture-in-picture';
+        iframe.frameBorder = '0';
+        iframe.style.cssText = 'width:100%; aspect-ratio:16/9; border-radius:6px; background:black; border:3px solid var(--ink);';
+        wrap.appendChild(iframe);
+      } else if (kind === 'video' || kind === 'audio') {
+        const el = document.createElement(kind);
         el.src = c.clipUrl;
         el.controls = true;
         el.preload = 'metadata';
         el.id = `${side}-clip-el`;
+        el.dataset.kind = kind;
         wrap.appendChild(el);
+      } else {
+        // 'link' — boton clickeable
+        const a = document.createElement('a');
+        a.href = c.clipUrl;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = '🔗 Abrir cancion';
+        a.style.cssText = 'display:block; padding:12px; text-align:center; background:var(--ink); color:var(--accent-yellow); border-radius:6px; text-decoration:none; font-family:Archivo Black;';
+        wrap.appendChild(a);
       }
     }
   }
@@ -369,12 +395,26 @@
   function handleClipControl(msg) {
     const el = document.getElementById(`${msg.side}-clip-el`);
     if (!el) return;
-    if (msg.action === 'play') {
-      // Mejor esfuerzo: ambas browser sources arrancan a la vez. Hay drift
-      // de red ~100-300ms entre los dos OBS — flagged en el README.
-      el.play().catch(() => { /* autoplay puede estar bloqueado */ });
-    } else if (msg.action === 'pause') {
-      el.pause();
+    const kind = el.dataset.kind || el.tagName.toLowerCase();
+    if (kind === 'iframe') {
+      // Truco simple para play/pause sin postMessage APIs distintas por
+      // plataforma: setear src al embed con autoplay (play) o cargar el
+      // src base sin autoplay (pause). Para plataformas que no respetan
+      // autoplay del query string, esto al menos recarga el clip.
+      if (msg.action === 'play') {
+        el.src = el.dataset.autoplay || el.dataset.embed;
+      } else if (msg.action === 'pause') {
+        // Reseteamos a embed sin autoplay para "parar" el video.
+        el.src = el.dataset.embed;
+      }
+      return;
+    }
+    if (kind === 'video' || kind === 'audio') {
+      if (msg.action === 'play') {
+        el.play().catch(() => { /* autoplay puede estar bloqueado por el browser */ });
+      } else if (msg.action === 'pause') {
+        el.pause();
+      }
     }
   }
 

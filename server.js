@@ -319,24 +319,37 @@ function mountCountryRoutes(country) {
       const prTeam   = stateMod.state.countries.pr.lockedTeam;
       const built = bracketMod.buildFromTeams(cubaTeam, prTeam, { shuffle: true });
       if (built.ok) {
-        const contestants = {};
-        for (const id of [...cubaTeam, ...prTeam]) {
-          const s = stateMod.getSubmission(id);
-          if (!s) continue;
-          contestants[id] = {
-            id: s.id, name: s.name, country: s.country,
-            photoUrl: '',
-            bio: s.instagram ? '@' + s.instagram : '',
-            clipUrl: s.mediaUrl,
-            clipType: s.mediaType === 'audio' ? 'audio' : 'video',
-          };
-        }
+        const contestants = buildContestants([...cubaTeam, ...prTeam]);
         stateMod.startShow(contestants, built.pairings, built.bracket);
         return res.json({ ok: true, ready, bothReady: true, showStarted: true });
       }
     }
     res.json({ ok: true, ready, bothReady: r.bothReady });
   });
+}
+
+/**
+ * Construye el dict de contestants a partir de submission IDs.
+ * Incluye los formatos de embed (iframe / video / audio / link) listos
+ * para que show.js los renderice sin tener que volver a parsear el URL.
+ */
+function buildContestants(ids) {
+  const out = {};
+  for (const id of ids) {
+    const s = stateMod.getSubmission(id);
+    if (!s) continue;
+    const embed = subs.getEmbedInfo(s.mediaUrl) || { kind: 'link', embedUrl: s.mediaUrl, autoplayUrl: s.mediaUrl };
+    out[id] = {
+      id: s.id, name: s.name, country: s.country,
+      photoUrl: '',
+      bio: s.instagram ? '@' + s.instagram : '',
+      clipUrl: s.mediaUrl,                      // original (para mostrar al lado)
+      clipKind: embed.kind,                     // 'iframe' | 'video' | 'audio' | 'link'
+      clipEmbed: embed.embedUrl,                // src cuando NO se reproduce
+      clipEmbedAutoplay: embed.autoplayUrl,     // src cuando el host pulsa play
+    };
+  }
+  return out;
 }
 mountCountryRoutes('cuba');
 mountCountryRoutes('pr');
