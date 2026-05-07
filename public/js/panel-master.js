@@ -18,18 +18,21 @@
 (() => {
   'use strict';
 
-  // Detectar role-lock por URL: /panel/master/cuba → solo PIN_CUBA / role=cuba
-  //                            /panel/master/pr   → solo PIN_PR   / role=pr
-  //                            /panel/master      → cualquier PIN (backward-compat)
+  // 3 modos segun la URL:
+  //   /panel/master/cuba  → role-locked CUBA (PIN + boton activo de Cuba)
+  //   /panel/master/pr    → role-locked PR
+  //   /panel/master       → vista publica read-only (SIN PIN, SIN botones)
+  //                         solo muestra el estado actual del show.
   const targetRole = location.pathname.endsWith('/cuba') ? 'cuba'
                    : location.pathname.endsWith('/pr')   ? 'pr'
                    : null;
+  const isPublicView = !targetRole;
 
   const TOKEN_KEY = 'elpajaro.token.master.' + (targetRole || 'shared');
   const PIN_KEY = TOKEN_KEY + '.pin';
   let token = localStorage.getItem(TOKEN_KEY) || null;
   let savedPin = localStorage.getItem(PIN_KEY) || null;
-  let session = null;       // { role: 'cuba'|'pr'|'master' }
+  let session = null;       // { role: 'cuba'|'pr'|'master' } o null en publico
   let serverState = null;
 
   // Customizar la pantalla de login segun el targetRole
@@ -41,6 +44,9 @@
     if (loginP)  loginP.textContent  = targetRole === 'cuba'
       ? 'Solo Kristoff (PIN de Cuba). Tu boton ESTOY LISTO va a estar activo.'
       : 'Solo el streamer PR (PIN de PR). Tu boton ESTOY LISTO va a estar activo.';
+  } else {
+    // Vista publica — esconder cosas interactivas, mostrar CTA con URLs reales
+    document.title = 'Master · El Pajaro';
   }
 
   const $ = (id) => document.getElementById(id);
@@ -144,11 +150,23 @@
   }
 
   async function tryResume() {
+    // VISTA PUBLICA: sin login, sin botones. Solo muestra el estado del show.
+    // Los datos vienen del WS broadcast (que no incluye info sensible) +
+    // un fetch inicial via /api/state.
+    if (isPublicView) {
+      try {
+        const res = await fetch('/api/state');
+        const data = await res.json();
+        serverState = data.state;
+      } catch {}
+      showMainPublic();
+      return;
+    }
+    // ROLE-LOCKED: necesita login.
     // 1) Token guardado: intentar validar
     if (token) {
       try {
         const r = await api('/api/admin/validate', {});
-        // Si la URL es role-locked y el token es de otro rol, descartar
         if (targetRole && r.role !== targetRole) {
           logout(false);
           return;
@@ -174,6 +192,41 @@
     }
     // 3) Sin nada — login
     showLogin();
+  }
+
+  // Vista publica: muestra los slots y status, esconde botones de accion.
+  function showMainPublic() {
+    $('login-screen').classList.add('hidden');
+    $('main-panel').classList.remove('hidden');
+    // Esconder botones de accion + reemplazarlos por CTA con URLs reales
+    const btnCuba = $('ready-cuba');
+    const btnPr   = $('ready-pr');
+    if (btnCuba) btnCuba.style.display = 'none';
+    if (btnPr)   btnPr.style.display = 'none';
+    // Esconder el boton Salir
+    const btnLogout = $('btn-logout');
+    if (btnLogout) btnLogout.style.display = 'none';
+    // Reemplazar role-tag por badge de "VISTA PUBLICA"
+    const tag = document.querySelector('.role-tag');
+    if (tag) {
+      tag.textContent = 'VISTA PÚBLICA';
+      tag.classList.remove('role-cuba', 'role-pr', 'role-master');
+      tag.style.background = 'rgba(255,255,255,.12)';
+      tag.style.color = 'var(--text)';
+    }
+    // Reemplazar el ready-status por un CTA hacia las URLs role-locked
+    const status = $('ready-status');
+    if (status) {
+      status.innerHTML = `
+        <div style="text-align:center; line-height: 1.7; color: var(--text-soft); font-size: .85rem;">
+          <strong style="color: var(--gold); display:block; margin-bottom: 8px;">Vista pública (solo lectura)</strong>
+          Los streamers entran desde sus URLs:<br/>
+          <a href="/panel/master/cuba" style="color: var(--cuba-300); text-decoration: underline;">Kristoff → /panel/master/cuba</a><br/>
+          <a href="/panel/master/pr"   style="color: var(--pr-300);   text-decoration: underline;">PR → /panel/master/pr</a>
+        </div>
+      `;
+    }
+    renderAll();
   }
 
   /* ===== Render slots =====
