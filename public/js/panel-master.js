@@ -754,15 +754,47 @@
   }
 
   /* ===== Twitch widgets =====
-   * Cada vez que llega un broadcast del state, refrescamos el dot/label.
-   * Click en el widget abre el OAuth flow en popup (igual que panel-country).
-   * Sin esto, el chat NO llega — el IRC bot se queda dormido. */
+   * Reglas de visibilidad/permisos:
+   *   /panel/master/cuba (Kristoff)  → solo widget CUBA, solo el puede tocar
+   *   /panel/master/pr   (otro)      → solo widget PR, solo el puede tocar
+   *   /panel/master      (publico)   → ambos widgets visibles, NO clickeables
+   *
+   * Por que: nadie tiene la cuenta de Twitch del otro. Kristoff no puede
+   * conectar el chat de PR aunque vea el widget — y vice versa. Ocultar
+   * el widget ajeno saca un boton inutil y deja claro de quien es la tarea.
+   * En la vista publica los dos se ven como info read-only.
+   */
   function renderTwitchWidgets() {
     const conns = serverState?.twitchConnections || {};
+    const myRole = session?.role; // 'cuba' | 'pr' | 'master' | null (publico)
+
     for (const side of ['cuba', 'pr']) {
       const w = $(`tw-${side}`);
       if (!w) continue;
       const c = conns[side] || {};
+
+      // Visibilidad: en role-locked solo se ve el widget propio.
+      // En publico se ven ambos. (master con PIN unico tambien ve ambos
+      // por compatibilidad, aunque el flujo "real" esta separado en /cuba y /pr.)
+      const isMine = myRole === side || myRole === 'master';
+      const visibleHere = isPublicView || isMine;
+      w.style.display = visibleHere ? '' : 'none';
+
+      // Click solo si es mio y no soy publico.
+      // (El click handler global ya esta puesto, aca solo decidimos enable/disable
+      // visualmente con cursor + atributo disabled-like.)
+      if (isPublicView || !isMine) {
+        w.disabled = true;
+        w.style.cursor = 'default';
+        w.title = isPublicView
+          ? `Vista publica — ${side.toUpperCase()} conecta desde su URL`
+          : `Solo el rol ${side.toUpperCase()} puede conectar este chat`;
+      } else {
+        w.disabled = false;
+        w.style.cursor = 'pointer';
+        w.title = `Conectar chat de Twitch (${side.toUpperCase()})`;
+      }
+
       w.classList.toggle('live', !!c.connected);
       w.classList.toggle('off',  !c.connected);
       const statusEl = w.querySelector('.tw-status');
@@ -773,29 +805,62 @@
       }
     }
 
-    // Warning: si el voting esta activo y algun lado del chat esta off,
-    // mostrar el banner rojo grande con CTAs para conectar.
+    renderTwitchWarning();
+  }
+
+  /**
+   * Warning grande cuando entras a phase=voting sin chats conectados.
+   * Misma logica de permisos que los widgets: solo mostramos el boton de
+   * conectar para el rol propio. Si el OTRO lado esta off, mostramos
+   * "esperando que [otro] conecte" sin boton (no podemos hacer nada por el).
+   */
+  function renderTwitchWarning() {
+    const warn = $('twitch-warning');
+    if (!warn) return;
+    const conns = serverState?.twitchConnections || {};
     const cur = serverState?.currentMatch;
     const inVoting = cur && cur.phase === 'voting';
     const cubaOff = !conns.cuba?.connected;
     const prOff   = !conns.pr?.connected;
-    const warn = $('twitch-warning');
-    if (!warn) return;
-    if (inVoting && (cubaOff || prOff)) {
-      warn.classList.remove('hidden');
-      const both = cubaOff && prOff;
-      $('twitch-warning-title').textContent = both
-        ? 'AMBOS CHATS DESCONECTADOS'
-        : (cubaOff ? 'CHAT CUBA DESCONECTADO' : 'CHAT PR DESCONECTADO');
-      $('twitch-warning-detail').textContent = both
-        ? 'Ningun voto del chat se esta contando. Conectá los dos para que el bracket funcione.'
-        : 'Los votos de ese canal no se cuentan. Conectalo ya.';
-      // Esconder los botones del lado que SI esta conectado
-      $('warn-connect-cuba').style.display = cubaOff ? '' : 'none';
-      $('warn-connect-pr').style.display   = prOff   ? '' : 'none';
-    } else {
+    const myRole = session?.role;
+
+    if (!inVoting || (!cubaOff && !prOff)) {
       warn.classList.add('hidden');
+      return;
     }
+    warn.classList.remove('hidden');
+
+    // Mensaje + botones segun mi rol y que esta off
+    let title, detail;
+    const myOff    = (myRole === 'cuba' && cubaOff) || (myRole === 'pr' && prOff);
+    const otherOff = (myRole === 'cuba' && prOff)   || (myRole === 'pr' && cubaOff);
+    const otherName = myRole === 'cuba' ? 'PR' : 'CUBA';
+
+    if (isPublicView) {
+      // Vista publica: solo informa, sin botones
+      const both = cubaOff && prOff;
+      title = both ? 'AMBOS CHATS DESCONECTADOS'
+                   : (cubaOff ? 'CHAT CUBA DESCONECTADO' : 'CHAT PR DESCONECTADO');
+      detail = 'Cada streamer conecta el suyo desde su panel role-locked.';
+    } else if (myOff && otherOff) {
+      title = 'AMBOS CHATS DESCONECTADOS';
+      detail = `Conectá tu chat (${myRole.toUpperCase()}). Esperando que ${otherName} conecte el suyo.`;
+    } else if (myOff) {
+      title = `TU CHAT (${myRole.toUpperCase()}) ESTA OFF`;
+      detail = 'Conectá ya — sino tus votos no llegan.';
+    } else if (otherOff) {
+      title = `CHAT ${otherName} DESCONECTADO`;
+      detail = `Esperando que ${otherName} conecte. Tu lado está OK.`;
+    }
+
+    $('twitch-warning-title').textContent = title;
+    $('twitch-warning-detail').textContent = detail;
+
+    // Botones: solo el del rol propio aparece, y solo si MI chat esta off.
+    const showCubaBtn = !isPublicView && myRole === 'cuba' && cubaOff;
+    const showPrBtn   = !isPublicView && myRole === 'pr'   && prOff;
+    $('warn-connect-cuba').style.display = showCubaBtn ? '' : 'none';
+    $('warn-connect-pr').style.display   = showPrBtn   ? '' : 'none';
   }
 
   function openTwitchAuth(side) {
@@ -804,12 +869,27 @@
     window.open(`/api/twitch/auth?from=${side}`, 'twitchAuth', 'width=720,height=820');
   }
 
-  // Click handlers (definidos una vez al cargar)
+  // Click handlers (definidos una vez al cargar). Los handlers chequean
+  // permisos en runtime — aunque el widget este escondido o disabled,
+  // un click programatico no hace nada si no es tu rol.
   ['cuba', 'pr'].forEach(side => {
     const btn = $(`tw-${side}`);
-    if (btn) btn.addEventListener('click', () => openTwitchAuth(side));
+    if (btn) btn.addEventListener('click', () => {
+      if (isPublicView) return;
+      const myRole = session?.role;
+      if (myRole !== side && myRole !== 'master') {
+        toast(`Solo el rol ${side.toUpperCase()} puede conectar ese chat`);
+        return;
+      }
+      openTwitchAuth(side);
+    });
     const warnBtn = $(`warn-connect-${side}`);
-    if (warnBtn) warnBtn.addEventListener('click', () => openTwitchAuth(side));
+    if (warnBtn) warnBtn.addEventListener('click', () => {
+      if (isPublicView) return;
+      const myRole = session?.role;
+      if (myRole !== side && myRole !== 'master') return;
+      openTwitchAuth(side);
+    });
   });
 
   /* ===== Render ===== */
