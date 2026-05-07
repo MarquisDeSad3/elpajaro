@@ -75,11 +75,17 @@ async function api(path, body, token, headers = {}) {
 async function run() {
   console.log(`→ TARGET: ${BASE}\n`);
 
-  // Login + reset
+  // Login. NO HACEMOS RESET — para no borrar inscripciones reales que
+  // pudieran haber llegado entre runs. Si querés un reset, correlo manualmente
+  // pasando RESET=1 como env var: RESET=1 node test-populate-both.js
   let r = await api('/api/admin/login', { pin: PIN_CUBA, role: 'master' });
   const tokenMaster = r.data.token;
-  await api('/api/master/reset-all', {}, tokenMaster);
-  console.log('reset OK\n');
+  if (process.env.RESET === '1') {
+    await api('/api/master/reset-all', {}, tokenMaster);
+    console.log('⚠ RESET=1 — wipe completo OK\n');
+  } else {
+    console.log('(no reset — agregando submissions sobre el state actual)\n');
+  }
 
   // Submissions cubanas
   console.log(`Mandando ${CUBANOS.length} cubanas`);
