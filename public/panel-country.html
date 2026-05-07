@@ -236,13 +236,13 @@
       background: var(--glass-strong);
       border: 1px solid var(--glass-border);
       border-radius: var(--radius);
-      padding: 14px;
+      padding: 0;
       cursor: pointer;
       transition: var(--transition);
       position: relative;
-      min-height: 110px;
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
+      overflow: hidden;
     }
     .p1-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
     .p1-card.passed {
@@ -250,34 +250,81 @@
       border-color: rgba(45, 234, 159, .55);
       box-shadow: 0 4px 16px rgba(45, 212, 122, .25);
     }
-    .p1-card.rejected { opacity: .35; filter: grayscale(.6); }
+    .p1-card.rejected { opacity: .4; filter: grayscale(.6); }
     .p1-card.active-vote {
       background: var(--gold-grad);
       color: var(--ink);
       border-color: var(--gold);
       box-shadow: 0 6px 20px var(--gold-glow);
     }
+    /* === Thumbnail (top of card) === */
+    .p1-card .thumb {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #14093b center/cover no-repeat;
+      position: relative;
+      border-bottom: 1px solid var(--glass-border);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .p1-card .thumb-icon {
+      font-size: 2.4rem;
+      filter: drop-shadow(0 4px 10px rgba(0,0,0,.5));
+      opacity: .85;
+    }
+    .p1-card .thumb::after {
+      content: '▶';
+      position: absolute;
+      width: 42px; height: 42px;
+      display: grid; place-items: center;
+      background: rgba(0,0,0,.55);
+      border-radius: 50%;
+      color: white;
+      font-size: 1rem;
+      backdrop-filter: blur(4px);
+      transition: opacity var(--transition);
+    }
+    .p1-card:hover .thumb::after { background: rgba(0,0,0,.75); transform: scale(1.05); }
+    .p1-card.rejected .thumb::after,
+    .p1-card.passed .thumb::after { display: none; }
     .p1-card .num {
       position: absolute; top: 8px; right: 10px;
       font-family: 'Archivo Black', sans-serif;
-      background: rgba(0,0,0,.35); color: var(--gold);
-      padding: 2px 8px; border-radius: 100px;
-      font-size: .7rem;
+      background: rgba(0,0,0,.62); color: var(--gold);
+      padding: 3px 9px; border-radius: 100px;
+      font-size: .68rem;
+      backdrop-filter: blur(6px);
+      z-index: 2;
     }
     .p1-card.active-vote .num { background: var(--ink); color: var(--gold); }
+    .p1-card .body {
+      padding: 12px 14px 14px;
+    }
     .p1-card .name {
       font-family: 'Archivo Black', sans-serif;
       font-size: .98rem; letter-spacing: .5px;
-      margin-bottom: 4px;
-      padding-right: 36px;
+      margin-bottom: 2px;
+      padding-right: 4px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .p1-card .ig { font-size: .78rem; color: var(--muted); margin-bottom: 8px; }
+    .p1-card .ig { font-size: .76rem; color: var(--muted); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .p1-card.active-vote .ig { color: rgba(26, 18, 48, .65); }
     .p1-card .decision {
       font-family: 'Archivo Black', sans-serif;
       font-size: .72rem; letter-spacing: 1px;
-      margin-top: 6px;
+      margin-top: 4px;
     }
+    .p1-card .platform-tag {
+      position: absolute; bottom: 8px; right: 8px;
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .58rem; letter-spacing: 1px;
+      padding: 2px 6px; border-radius: 4px;
+      background: rgba(0,0,0,.55);
+      color: white;
+      text-transform: uppercase;
+      backdrop-filter: blur(4px);
+    }
+    .p1-card.passed .platform-tag,
+    .p1-card.rejected .platform-tag { display: none; }
 
     /* Modal */
     .p1-modal {

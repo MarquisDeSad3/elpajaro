@@ -345,12 +345,26 @@
       if (s.id === activeId) cls.push('active-vote');
       const decisionTxt = s.eliminationDecision === 'passed' ? '✓ PASÓ'
                        : s.eliminationDecision === 'rejected' ? '✗ FUERA' : '— pendiente —';
+
+      // Thumbnail: si tenemos URL real (YouTube/Vimeo), mostrar imagen. Si
+      // no, mostrar un icono segun la plataforma.
+      const thumbStyle = s.clipThumbnail ? `background-image:url('${escapeAttr(s.clipThumbnail)}')` : '';
+      const platformIcon = platformIconFor(s.clipPlatform);
+      const platformTag  = s.clipPlatform && s.clipPlatform !== 'iframe' && s.clipPlatform !== 'link'
+        ? `<span class="platform-tag">${escapeHtml(s.clipPlatform)}</span>` : '';
+
       return `
         <div class="${cls.join(' ')}" data-id="${s.id}">
           <div class="num">#${i + 1}</div>
-          <div class="name">${escapeHtml(s.name)}</div>
-          <div class="ig">${s.instagram ? '@' + escapeHtml(s.instagram) : ''}</div>
-          <div class="decision">${decisionTxt}</div>
+          <div class="thumb" style="${thumbStyle}">
+            ${s.clipThumbnail ? '' : `<span class="thumb-icon">${platformIcon}</span>`}
+            ${platformTag}
+          </div>
+          <div class="body">
+            <div class="name">${escapeHtml(s.name)}</div>
+            <div class="ig">${s.instagram ? '@' + escapeHtml(s.instagram) : ''}</div>
+            <div class="decision">${decisionTxt}</div>
+          </div>
         </div>
       `;
     }).join('');
@@ -540,6 +554,23 @@
     return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
   function escapeAttr(s) { return escapeHtml(s); }
+
+  // Icono por plataforma cuando no tenemos miniatura disponible
+  function platformIconFor(platform) {
+    switch (platform) {
+      case 'youtube':   return '▶️';
+      case 'vimeo':     return '🎬';
+      case 'tiktok':    return '🎵';
+      case 'instagram': return '📸';
+      case 'facebook':  return '📘';
+      case 'spotify':   return '🎧';
+      case 'soundcloud':return '🔊';
+      case 'drive':     return '📁';
+      case 'audio':     return '🔊';
+      case 'video':     return '🎥';
+      default:          return '🎤';
+    }
+  }
 
   /* ===== Boot ===== */
   wsConnect();
