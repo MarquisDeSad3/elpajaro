@@ -5,8 +5,8 @@
  *
  *   /                    Landing publico dinamico
  *   /enviar              Form publico de inscripcion (3 pasos mobile)
- *   /panel/cuba          Panel Pablo (PIN -> role=cuba)
- *   /panel/pr            Panel Kristoff (PIN -> role=pr)
+ *   /panel/cuba          Panel del streamer cubano (PIN -> role=cuba)
+ *   /panel/pr            Panel del streamer puertorriqueno (PIN -> role=pr)
  *   /panel/master        Panel master (PIN -> role=master)
  *   /show                Overlay del show (OBS Browser Source)
  *
@@ -500,8 +500,8 @@ server.listen(PORT, () => {
   console.log(`│  El Pajaro corriendo en :${PORT}              │`);
   console.log(`│  /                landing                  │`);
   console.log(`│  /enviar          form publico             │`);
-  console.log(`│  /panel/cuba      Pablo (PIN)              │`);
-  console.log(`│  /panel/pr        Kristoff (PIN)           │`);
+  console.log(`│  /panel/cuba      streamer cubano (PIN)    │`);
+  console.log(`│  /panel/pr        streamer PR (PIN)        │`);
   console.log(`│  /panel/master    master (PIN)             │`);
   console.log(`│  /show            overlay OBS              │`);
   console.log(`└────────────────────────────────────────────┘\n`);
