@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Master · El Pajaro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Archivo+Black&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/common.css" />
+  <style>
+    body { padding-bottom: 32px; }
+    .panel-header {
+      position: sticky; top: 0; z-index: 5;
+      background: rgba(24, 19, 33, .95);
+      backdrop-filter: blur(8px);
+      padding: 10px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 4px solid var(--ink);
+      gap: 16px; flex-wrap: wrap;
+    }
+    .panel-header h1 {
+      font-family: 'Bangers', cursive; font-size: 1.6rem; letter-spacing: 3px; margin: 0;
+    }
+    .panel-header .role-tag {
+      display: inline-block; padding: 4px 10px;
+      border: 3px solid var(--ink); border-radius: 8px;
+      background: var(--accent-yellow); color: var(--ink);
+      font-family: 'Archivo Black', sans-serif; font-size: .8rem; letter-spacing: 2px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .login-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+    .login-card {
+      background: var(--paper); color: var(--ink);
+      border: 6px solid var(--ink); border-radius: 16px; box-shadow: var(--shadow);
+      padding: 32px 28px; width: min(420px, 92vw); text-align: center;
+    }
+    .login-card h2 { font-family: 'Bangers', cursive; font-size: 2.2rem; margin: 0 0 8px; letter-spacing: 3px; }
+    .login-card p  { color: #555; font-size: .9rem; }
+
+    .panel-body { max-width: 1280px; margin: 0 auto; padding: 16px 20px; }
+
+    .countries-status {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;
+    }
+    @media (max-width: 720px) { .countries-status { grid-template-columns: 1fr; } }
+
+    .country-status {
+      padding: 16px 18px;
+    }
+    .country-status h2 {
+      font-family: 'Bangers', cursive; font-size: 1.8rem; letter-spacing: 2px;
+      margin: 0 0 8px;
+    }
+    .country-status .stat-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 5px 0; border-bottom: 2px dashed rgba(0,0,0,.15);
+      font-family: 'Archivo Black', sans-serif; font-size: .85rem;
+    }
+    .country-status .stat-row:last-child { border-bottom: 0; }
+    .country-status .ready-pill {
+      display: inline-block;
+      font-family: 'Bangers', cursive;
+      font-size: 1.4rem; letter-spacing: 2px;
+      padding: 6px 14px;
+      border: 4px solid var(--ink);
+      border-radius: 8px;
+      box-shadow: var(--shadow-sm);
+      margin-top: 10px;
+    }
+    .ready-pill.yes { background: #2dd47a; color: var(--ink); }
+    .ready-pill.no  { background: #999; color: white; }
+
+    .twitch-row {
+      display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;
+    }
+    .twitch-btn {
+      font-family: 'Archivo Black', sans-serif; letter-spacing: 1.5px;
+      padding: 6px 12px; border: 3px solid var(--ink); border-radius: 8px;
+      cursor: pointer; box-shadow: var(--shadow-sm);
+      display: inline-flex; align-items: center; gap: 6px;
+      color: white;
+      font-size: .8rem;
+    }
+    .twitch-btn.cuba { background: var(--cuba); }
+    .twitch-btn.pr   { background: var(--pr); }
+    .twitch-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #555; border: 2px solid var(--ink);
+    }
+    .twitch-dot.live { background: #2dd4bf; box-shadow: 0 0 6px #2dd4bf; }
+
+    .empezar-section {
+      background: rgba(255, 216, 74, .12);
+      border: 5px dashed var(--accent-yellow);
+      border-radius: 16px;
+      padding: 28px;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .empezar-section.disabled { opacity: .5; border-color: #666; background: rgba(0,0,0,.2); }
+    .empezar-section h2 {
+      font-family: 'Bangers', cursive; font-size: 2.4rem; letter-spacing: 3px;
+      color: var(--accent-yellow); -webkit-text-stroke: 1px var(--ink);
+      margin-bottom: 6px;
+    }
+    .empezar-section p { color: var(--paper-2); margin-bottom: 16px; }
+    .empezar-btn {
+      font-size: 1.4rem; padding: 18px 36px;
+      box-shadow: 8px 8px 0 var(--ink);
+      border-width: 5px;
+    }
+    .empezar-btn:hover { box-shadow: 6px 6px 0 var(--ink); transform: translate(-2px,-2px); }
+
+    .show-running {
+      background: rgba(45, 212, 122, .12);
+      border: 5px solid #2dd47a;
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 24px;
+    }
+    .show-running h2 {
+      color: #2dd47a; font-size: 2rem; letter-spacing: 2px; margin-bottom: 8px;
+    }
+
+    .bracket-list {
+      display: grid; gap: 6px;
+      margin-bottom: 14px;
+    }
+    .round-section h4 {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .8rem; letter-spacing: 2px;
+      color: var(--paper-2);
+      margin: 8px 0 4px;
+    }
+    .match-btn {
+      display: flex; align-items: center; gap: 10px;
+      background: white; color: var(--ink);
+      border: 3px solid var(--ink); border-radius: 8px;
+      padding: 8px 10px; cursor: pointer;
+      font-family: 'Inter', sans-serif; font-size: .85rem;
+      box-shadow: var(--shadow-sm); width: 100%;
+    }
+    .match-btn .vs { font-family: 'Bangers', cursive; color: var(--pr); }
+    .match-btn.active { background: var(--accent-yellow); }
+    .match-btn.done { background: #d6f5e3; opacity: .85; }
+    .match-btn .winner-tag {
+      font-family: 'Archivo Black', sans-serif;
+      background: var(--accent-yellow);
+      border: 2px solid var(--ink);
+      padding: 2px 6px; border-radius: 4px; font-size: .7rem;
+      margin-left: auto;
+    }
+
+    .controls-grid {
+      background: white; color: var(--ink);
+      border: 4px solid var(--ink); border-radius: 12px;
+      padding: 14px;
+    }
+    .controls-grid h3 {
+      font-family: 'Bangers', cursive; font-size: 1.4rem;
+      margin-bottom: 10px;
+    }
+    .controls-grid .ctl-row {
+      display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;
+    }
+
+    .consensus-box {
+      background: var(--accent-yellow); color: var(--ink);
+      border: 3px solid var(--ink); border-radius: 10px;
+      padding: 12px;
+      font-family: 'Archivo Black', sans-serif;
+      margin-top: 10px;
+    }
+    .consensus-box .vote-line { display: flex; justify-content: space-between; padding: 2px 0; }
+
+    .danger-zone {
+      margin-top: 28px; padding: 16px;
+      border: 3px dashed var(--pr); border-radius: 12px;
+    }
+    .danger-zone h3 { color: var(--pr); }
+  </style>
+</head>
+<body>
+<div class="halftone-bg"></div>
+
+<!-- ===== Login ===== -->
+<section id="login-screen" class="login-screen">
+  <div class="login-card">
+    <h2>MASTER</h2>
+    <p>Panel de orquestación. PIN del show.</p>
+    <form id="login-form" style="display:grid; gap:10px; margin-top:14px;">
+      <input class="input input-pin" type="password" id="pin" placeholder="PIN" autocomplete="off" />
+      <button type="submit" class="btn btn-yellow btn-big">ENTRAR</button>
+    </form>
+    <p class="error-msg" id="login-error" style="color:#d12; min-height:1.2em; margin-top:6px;"></p>
+  </div>
+</section>
+
+<!-- ===== Main ===== -->
+<div id="main-panel" class="hidden">
+  <header class="panel-header">
+    <h1 style="color: var(--accent-yellow);">EL PAJARO · MASTER</h1>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <span class="role-tag">MASTER</span>
+      <button id="btn-logout" class="btn btn-ghost" style="font-size:.8rem; padding:6px 12px;">Salir</button>
+    </div>
+  </header>
+
+  <main class="panel-body">
+
+    <!-- Twitch connection widgets -->
+    <div class="card" style="background: rgba(255,255,255,.06); border-color: var(--paper-2); padding: 14px 16px; margin-bottom: 16px; color: white;">
+      <h3 style="font-size: 1.2rem; color: var(--accent-yellow); margin-bottom: 8px;">CONEXIONES TWITCH</h3>
+      <p class="text-muted" style="font-size: .85rem; margin-bottom: 10px;">Cada streamer tiene que conectar su cuenta para que el chat de su canal vote.</p>
+      <div class="twitch-row">
+        <button class="twitch-btn cuba" id="btn-conn-cuba">
+          <span class="twitch-dot" id="dot-cuba"></span>
+          <span id="label-cuba">CONECTAR CUBA</span>
+        </button>
+        <button class="twitch-btn pr" id="btn-conn-pr">
+          <span class="twitch-dot" id="dot-pr"></span>
+          <span id="label-pr">CONECTAR PR</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Countries status -->
+    <div class="countries-status">
+      <div class="card card-cuba country-status">
+        <h2 style="color: var(--cuba);">CUBA</h2>
+        <div class="stat-row"><span>Inscripciones</span><span><strong id="cuba-count">0</strong> / <span id="cuba-cap">50</span></span></div>
+        <div class="stat-row"><span>Aprobadas</span><span id="cuba-approved">0</span></div>
+        <div class="stat-row"><span>Pasaron fase 1</span><span id="cuba-passed">0/8</span></div>
+        <div class="stat-row"><span>Inscripciones</span><span id="cuba-open">—</span></div>
+        <div style="text-align:center; margin-top:8px;">
+          <span class="ready-pill" id="cuba-ready">—</span>
+        </div>
+      </div>
+      <div class="card card-pr country-status">
+        <h2 style="color: var(--pr);">PUERTO RICO</h2>
+        <div class="stat-row"><span>Inscripciones</span><span><strong id="pr-count">0</strong> / <span id="pr-cap">50</span></span></div>
+        <div class="stat-row"><span>Aprobadas</span><span id="pr-approved">0</span></div>
+        <div class="stat-row"><span>Pasaron fase 1</span><span id="pr-passed">0/8</span></div>
+        <div class="stat-row"><span>Inscripciones</span><span id="pr-open">—</span></div>
+        <div style="text-align:center; margin-top:8px;">
+          <span class="ready-pill" id="pr-ready">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- EMPEZAR section (visible si los dos lockeados y show no empezo) -->
+    <div id="empezar-section" class="empezar-section disabled">
+      <h2>¿EMPEZAR EL SHOW?</h2>
+      <p id="empezar-status">Esperando que los dos paises cierren su equipo de 8.</p>
+      <label style="display:inline-flex; gap:6px; align-items:center; margin-bottom:14px; color: var(--paper-2);">
+        <input type="checkbox" id="shuffle-pairings" /> Sortear emparejamientos al azar
+      </label>
+      <br />
+      <button id="btn-empezar" class="btn btn-yellow empezar-btn" disabled>🏆 EMPEZAR COMPETENCIA</button>
+    </div>
+
+    <!-- Show running view -->
+    <div id="show-running" class="show-running hidden">
+      <h2>SHOW EN VIVO</h2>
+      <p class="text-muted">Click un match para abrirlo. Los controles abren preview, lanzan votación, reproducen clips. La decisión del ganador la votan Cuba y PR (consenso 2-de-2) desde sus paneles.</p>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px;">
+        <div>
+          <h3 style="font-size:1.2rem; color: var(--accent-yellow); margin-bottom:6px;">BRACKET</h3>
+          <div class="bracket-list" id="bracket-list"></div>
+        </div>
+        <div>
+          <div class="controls-grid">
+            <h3 id="active-match-title">Sin match activo</h3>
+            <div id="active-match-info" class="text-muted" style="font-size:.85rem; margin-bottom: 10px;">Seleccioná un match en el bracket.</div>
+            <div class="ctl-row">
+              <button id="ctl-preview" class="btn btn-cuba" disabled>1. PREVIEW</button>
+            </div>
+            <div class="ctl-row">
+              <button id="ctl-clip-left"  class="btn btn-cuba" disabled>▶ Clip izq</button>
+              <button id="ctl-clip-right" class="btn btn-pr"   disabled>▶ Clip der</button>
+              <button id="ctl-pause-clips" class="btn btn-ghost" disabled>⏸ Pausa</button>
+            </div>
+            <div class="ctl-row">
+              <label style="font-family:'Archivo Black',sans-serif; font-size:.85rem;">Voto (s):</label>
+              <input id="ctl-duration" type="number" min="10" max="300" value="60" class="input" style="width:80px; padding:6px 8px;" />
+              <button id="ctl-vote-start" class="btn btn-yellow" disabled>2. ABRIR VOTACIÓN</button>
+              <button id="ctl-vote-end"   class="btn btn-ghost"  disabled>Cerrar</button>
+            </div>
+            <div id="consensus-box" class="consensus-box hidden"></div>
+            <div class="ctl-row">
+              <button id="ctl-cancel-decision" class="btn btn-ghost" disabled>Cancelar voto en curso</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Danger zone -->
+    <div class="danger-zone">
+      <h3>ZONA DE PELIGRO</h3>
+      <div class="row gap-md">
+        <button id="btn-reset-show" class="btn btn-ghost">Resetear show (preserva submissions)</button>
+        <button id="btn-reset-all" class="btn btn-danger">RESET TOTAL (borra todo)</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="/js/panel-master.js"></script>
+</body>
+</html>

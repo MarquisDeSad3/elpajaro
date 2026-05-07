@@ -1,0 +1,192 @@
+/* ============================================================
+   El Pajaro — paleta y estilos compartidos
+   ============================================================ */
+
+:root {
+  --cuba: #0079d2;
+  --cuba-dark: #003a78;
+  --cuba-light: #d3edff;
+  --pr: #ce1126;
+  --pr-dark: #7c0a17;
+  --pr-light: #ffd9de;
+  --ink: #0a0a0f;
+  --paper: #f6efe2;
+  --paper-2: #fbe9b8;
+  --accent-yellow: #ffd84a;
+  --bg: #181321;
+  --muted: rgba(255,255,255,.6);
+  --shadow: 6px 6px 0 var(--ink);
+  --shadow-sm: 3px 3px 0 var(--ink);
+  --shadow-pop: 8px 8px 0 var(--ink);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  font-family: 'Inter', sans-serif;
+  background:
+    radial-gradient(circle at 12% 20%, rgba(0,121,210,.20) 0, transparent 38%),
+    radial-gradient(circle at 88% 80%, rgba(206,17,38,.20) 0, transparent 38%),
+    var(--bg);
+  color: white;
+  min-height: 100vh;
+}
+
+/* Halftone overlay decorativo */
+.halftone-bg {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image: repeating-radial-gradient(circle at 0 0, rgba(255,255,255, .035) 0, rgba(255,255,255, .035) 1px, transparent 1px, transparent 7px);
+}
+
+/* Tipografia */
+.font-display { font-family: 'Bangers', cursive; letter-spacing: 2px; }
+.font-strong  { font-family: 'Archivo Black', sans-serif; letter-spacing: 1.5px; }
+
+/* Headings */
+h1, h2, h3 { font-family: 'Bangers', cursive; letter-spacing: 2px; margin: 0; }
+
+/* Botones comic */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font-family: 'Archivo Black', sans-serif;
+  letter-spacing: 1.5px;
+  padding: 10px 18px;
+  border: 4px solid var(--ink);
+  border-radius: 10px;
+  cursor: pointer;
+  background: white;
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  transition: transform .12s, box-shadow .12s;
+  text-decoration: none;
+  font-size: .95rem;
+}
+.btn:hover  { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
+.btn:active { transform: translate(2px, 2px);   box-shadow: 1px 1px 0 var(--ink); }
+.btn:disabled, .btn.disabled { opacity: .35; cursor: not-allowed; transform: none; box-shadow: var(--shadow-sm); }
+
+.btn-yellow { background: var(--accent-yellow); }
+.btn-cuba   { background: var(--cuba); color: white; }
+.btn-pr     { background: var(--pr);   color: white; }
+.btn-ghost  { background: transparent; color: var(--paper); border-color: var(--paper); box-shadow: none; }
+.btn-ghost:hover { background: rgba(255,255,255,.08); transform: none; box-shadow: none; }
+.btn-danger { background: var(--pr); color: white; }
+.btn-success{ background: #2dd47a; color: var(--ink); }
+.btn-big    { padding: 16px 28px; font-size: 1.1rem; box-shadow: var(--shadow); border-width: 5px; }
+
+/* Inputs */
+.input {
+  font-family: 'Inter', sans-serif;
+  width: 100%;
+  padding: 12px 14px;
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+  font-size: 1rem;
+  background: white;
+  color: var(--ink);
+}
+.input:focus { outline: 4px solid var(--accent-yellow); outline-offset: 0; }
+.input-pin {
+  font-family: 'Archivo Black', sans-serif;
+  letter-spacing: 8px;
+  font-size: 1.6rem;
+  text-align: center;
+  padding: 14px 12px;
+}
+.label-strong {
+  display: block;
+  font-family: 'Archivo Black', sans-serif;
+  letter-spacing: 1.5px;
+  font-size: .85rem;
+  margin-bottom: 6px;
+  color: var(--paper-2);
+}
+
+/* Card */
+.card {
+  background: var(--paper);
+  color: var(--ink);
+  border: 5px solid var(--ink);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+.card-cuba   { border-color: var(--cuba);   background: linear-gradient(160deg, var(--cuba-light) 0%, white 100%); }
+.card-pr     { border-color: var(--pr);     background: linear-gradient(160deg, var(--pr-light)   0%, white 100%); }
+
+/* Badges */
+.badge {
+  display: inline-block;
+  font-family: 'Archivo Black', sans-serif;
+  font-size: .7rem; letter-spacing: 2px;
+  padding: 3px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: white;
+}
+.badge-cuba   { background: var(--cuba); color: white; }
+.badge-pr     { background: var(--pr);   color: white; }
+.badge-yellow { background: var(--accent-yellow); }
+.badge-green  { background: #2dd47a; }
+.badge-gray   { background: #999; color: white; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(40px);
+  background: var(--ink); color: var(--accent-yellow);
+  font-family: 'Archivo Black', sans-serif; font-size: .9rem; letter-spacing: 1px;
+  padding: 12px 22px; border-radius: 10px; border: 3px solid var(--accent-yellow);
+  box-shadow: var(--shadow-sm);
+  opacity: 0; pointer-events: none; transition: opacity .3s, transform .3s;
+  z-index: 100;
+  max-width: 90vw;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Utils */
+.hidden { display: none !important; }
+.shake { animation: shake .35s; }
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.gap-sm { gap: 6px; } .gap-md { gap: 12px; } .gap-lg { gap: 20px; }
+.text-muted { color: var(--muted); }
+.text-cuba   { color: var(--cuba); }
+.text-pr     { color: var(--pr); }
+
+.title-wrap {
+  text-align: center;
+  margin: 32px 0 24px;
+}
+.title-kicker {
+  font-family: 'Archivo Black', sans-serif;
+  font-size: .8rem; letter-spacing: 4px;
+  color: var(--accent-yellow);
+  text-transform: uppercase;
+}
+.title-main {
+  font-family: 'Bangers', cursive;
+  font-size: clamp(2.2rem, 6vw, 4.4rem);
+  letter-spacing: 4px;
+  margin: 4px 0;
+  color: white;
+  -webkit-text-stroke: 2px var(--ink);
+  text-shadow: 4px 4px 0 var(--ink);
+}
+.title-main .cuba { color: var(--cuba); }
+.title-main .pr   { color: var(--pr); }
+.title-main .amp  { color: var(--accent-yellow); margin: 0 8px; }
+.title-sub {
+  font-family: 'Archivo Black', sans-serif;
+  font-size: clamp(.7rem, 1.2vw, 1rem);
+  letter-spacing: 3px;
+  color: var(--paper-2);
+}

@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Envia tu cancion · El Pajaro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Archivo+Black&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/common.css" />
+  <style>
+    .enviar-wrap {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 20px 16px 60px;
+      position: relative; z-index: 1;
+    }
+    .step-progress {
+      display: flex; gap: 8px; margin-bottom: 24px;
+    }
+    .step-pill {
+      flex: 1; height: 8px;
+      background: rgba(255,255,255,.12);
+      border: 2px solid var(--ink);
+      border-radius: 6px;
+    }
+    .step-pill.active { background: var(--accent-yellow); }
+    .step-pill.done   { background: #2dd47a; }
+
+    .step { display: none; }
+    .step.active { display: block; }
+
+    .step-title {
+      font-family: 'Bangers', cursive;
+      font-size: 1.8rem; letter-spacing: 2px;
+      margin: 0 0 6px;
+      color: white;
+      -webkit-text-stroke: 1.5px var(--ink);
+      text-shadow: 3px 3px 0 var(--ink);
+    }
+    .step-helper {
+      color: var(--paper-2);
+      font-size: .9rem;
+      margin: 0 0 18px;
+    }
+
+    /* Step 1 — country picker (big touch targets) */
+    .country-pick {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    }
+    .country-btn {
+      padding: 24px 12px;
+      border: 5px solid var(--ink);
+      border-radius: 14px;
+      cursor: pointer;
+      font-family: 'Bangers', cursive;
+      font-size: 1.6rem; letter-spacing: 2px;
+      box-shadow: var(--shadow-sm);
+      transition: transform .12s, box-shadow .12s;
+      color: white;
+    }
+    .country-btn.cuba { background: var(--cuba); }
+    .country-btn.pr   { background: var(--pr); }
+    .country-btn:hover { transform: translate(-2px,-2px); box-shadow: 5px 5px 0 var(--ink); }
+    .country-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+    .country-btn.selected {
+      outline: 4px solid var(--accent-yellow);
+      outline-offset: 2px;
+    }
+    .country-btn .flag {
+      display: block; font-size: 2.2rem; margin-bottom: 6px;
+    }
+
+    /* Step 2 — name + IG */
+    .field { margin-bottom: 16px; }
+    .input-with-prefix { position: relative; }
+    .input-with-prefix .prefix {
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      font-family: 'Archivo Black', sans-serif; color: #888;
+    }
+    .input-with-prefix input { padding-left: 32px; }
+
+    /* Step 3 — URL */
+    .url-helper {
+      background: rgba(255,255,255,.06);
+      border: 3px dashed var(--paper-2);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: .85rem;
+      margin-bottom: 14px;
+      line-height: 1.5;
+    }
+    .url-helper strong { color: var(--accent-yellow); }
+    .url-helper ul { margin: 6px 0 0 0; padding-left: 18px; }
+    .url-helper li { margin: 2px 0; }
+
+    .review-block {
+      background: white;
+      color: var(--ink);
+      border: 4px solid var(--ink);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+    .review-row {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 6px 0;
+      border-bottom: 1px dashed rgba(0,0,0,.15);
+      gap: 12px;
+    }
+    .review-row:last-child { border-bottom: 0; }
+    .review-row .lbl { font-family: 'Archivo Black', sans-serif; font-size: .75rem; letter-spacing: 1.5px; color: #666; flex: 0 0 auto; }
+    .review-row .val { font-family: 'Inter', sans-serif; font-weight: 600; word-break: break-word; text-align: right; }
+
+    .nav-row {
+      display: flex; gap: 10px; margin-top: 18px;
+    }
+    .nav-row .btn { flex: 1; }
+
+    .error-msg {
+      color: #ff6b7a;
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .85rem; letter-spacing: 1px;
+      margin: 8px 0 0;
+      min-height: 1.2em;
+    }
+
+    /* Success */
+    .success-card {
+      text-align: center;
+      padding: 32px 20px;
+    }
+    .success-burst {
+      font-size: 4rem;
+      margin-bottom: 8px;
+      animation: pop .6s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes pop {
+      0% { transform: scale(0); opacity: 0; }
+      60% { transform: scale(1.2); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .success-title {
+      font-family: 'Bangers', cursive;
+      font-size: 2.4rem; letter-spacing: 3px;
+      color: var(--ink);
+      margin: 0 0 6px;
+    }
+    .success-sub { color: #444; font-size: .95rem; }
+
+    .closed-card {
+      text-align: center; padding: 32px 20px; color: var(--ink);
+    }
+    .closed-icon { font-size: 3rem; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+<div class="halftone-bg"></div>
+
+<div class="enviar-wrap">
+  <div class="title-wrap" style="margin-top: 8px; margin-bottom: 16px;">
+    <div class="title-kicker">El Pajaro</div>
+    <h1 class="title-main">ENVIA TU CANCION</h1>
+  </div>
+
+  <!-- ===== Closed state (ambos paises cerrados) ===== -->
+  <div id="closedCard" class="card closed-card hidden">
+    <div class="closed-icon">🚫</div>
+    <h2 style="font-size:1.6rem; color:var(--ink); margin-bottom:6px;">Inscripciones cerradas</h2>
+    <p class="success-sub">Las inscripciones de los dos paises estan cerradas. Esperá la siguiente edicion.</p>
+    <a href="/" class="btn btn-yellow" style="margin-top:14px;">← Volver al inicio</a>
+  </div>
+
+  <!-- ===== Form (3 pasos) ===== -->
+  <div id="formCard" class="card hidden" style="background: var(--bg); border-color: var(--ink); color: white;">
+
+    <div class="step-progress">
+      <div class="step-pill active" data-pill="1"></div>
+      <div class="step-pill" data-pill="2"></div>
+      <div class="step-pill" data-pill="3"></div>
+    </div>
+
+    <!-- Step 1 -->
+    <div class="step active" data-step="1">
+      <h2 class="step-title">¿De donde sos?</h2>
+      <p class="step-helper">Tu pais define en que lado del bracket competis.</p>
+
+      <div class="country-pick">
+        <button type="button" class="country-btn cuba"  data-country="cuba">
+          <span class="flag">🇨🇺</span> CUBA
+        </button>
+        <button type="button" class="country-btn pr"    data-country="pr">
+          <span class="flag">🇵🇷</span> PR
+        </button>
+      </div>
+      <div id="step1-error" class="error-msg"></div>
+      <div id="step1-closed" class="error-msg hidden" style="color: var(--paper-2); margin-top: 10px;"></div>
+
+      <div class="nav-row">
+        <button id="btn-next-1" class="btn btn-yellow btn-big" disabled>SIGUIENTE →</button>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step" data-step="2">
+      <h2 class="step-title">Como te llamas</h2>
+      <p class="step-helper">Tu nombre artistico + redes para que la gente te encuentre.</p>
+
+      <div class="field">
+        <label class="label-strong" for="name">NOMBRE ARTISTICO</label>
+        <input class="input" type="text" id="name" maxlength="60" placeholder="Tu nombre" autocomplete="off" />
+      </div>
+
+      <div class="field">
+        <label class="label-strong" for="instagram">INSTAGRAM (opcional)</label>
+        <div class="input-with-prefix">
+          <span class="prefix">@</span>
+          <input class="input" type="text" id="instagram" maxlength="60" placeholder="tu_usuario" autocomplete="off" />
+        </div>
+      </div>
+
+      <div id="step2-error" class="error-msg"></div>
+
+      <div class="nav-row">
+        <button id="btn-back-2" class="btn btn-ghost">← Atras</button>
+        <button id="btn-next-2" class="btn btn-yellow btn-big">SIGUIENTE →</button>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step" data-step="3">
+      <h2 class="step-title">Tu cancion</h2>
+      <p class="step-helper">Pegá el link de tu cancion publicada.</p>
+
+      <div class="url-helper">
+        <strong>Sirven links de:</strong>
+        <ul>
+          <li>YouTube · TikTok · Instagram Reel</li>
+          <li>SoundCloud · Spotify</li>
+          <li>Google Drive · Dropbox</li>
+          <li>Cualquier link directo (.mp3, .mp4, etc)</li>
+        </ul>
+      </div>
+
+      <div class="field">
+        <label class="label-strong" for="mediaUrl">LINK DE TU CANCION</label>
+        <input class="input" type="url" id="mediaUrl" maxlength="500" placeholder="https://..." autocomplete="off" />
+      </div>
+
+      <div id="review" class="review-block hidden">
+        <div class="review-row"><span class="lbl">PAIS</span><span class="val" id="review-country">—</span></div>
+        <div class="review-row"><span class="lbl">NOMBRE</span><span class="val" id="review-name">—</span></div>
+        <div class="review-row"><span class="lbl">INSTAGRAM</span><span class="val" id="review-ig">—</span></div>
+        <div class="review-row"><span class="lbl">LINK</span><span class="val" id="review-url">—</span></div>
+      </div>
+
+      <div id="step3-error" class="error-msg"></div>
+
+      <div class="nav-row">
+        <button id="btn-back-3" class="btn btn-ghost">← Atras</button>
+        <button id="btn-submit"  class="btn btn-yellow btn-big">ENVIAR ✓</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== Success ===== -->
+  <div id="successCard" class="card success-card hidden">
+    <div class="success-burst">🎉</div>
+    <h2 class="success-title">¡ENVIADO!</h2>
+    <p class="success-sub">El admin de tu pais va a revisar tu inscripcion. Si te aprueba, pasas a la eliminacion.</p>
+    <a href="/" class="btn btn-yellow" style="margin-top:18px;">← Volver al inicio</a>
+  </div>
+
+  <div id="toast" class="toast"></div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+
+  let currentStep = 1;
+  const data = { country: null, name: '', instagram: '', mediaUrl: '' };
+  let stateSnapshot = null;
+
+  function setStep(n) {
+    currentStep = n;
+    document.querySelectorAll('.step').forEach(el => el.classList.toggle('active', +el.dataset.step === n));
+    document.querySelectorAll('.step-pill').forEach(el => {
+      const k = +el.dataset.pill;
+      el.classList.toggle('active', k === n);
+      el.classList.toggle('done',   k < n);
+    });
+    if (n === 3) updateReview();
+  }
+
+  function updateReview() {
+    if (!data.country || !data.name) return;
+    const review = $('review');
+    $('review-country').textContent = data.country === 'cuba' ? '🇨🇺 Cuba' : '🇵🇷 Puerto Rico';
+    $('review-name').textContent = data.name;
+    $('review-ig').textContent = data.instagram ? '@' + data.instagram : '—';
+    $('review-url').textContent = data.mediaUrl || '—';
+    review.classList.toggle('hidden', !data.mediaUrl);
+  }
+
+  function showToast(msg, ms = 2400) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => t.classList.remove('show'), ms);
+  }
+
+  function setError(stepN, msg) {
+    const el = $(`step${stepN}-error`);
+    el.textContent = msg || '';
+    if (msg) {
+      el.classList.add('shake');
+      setTimeout(() => el.classList.remove('shake'), 400);
+    }
+  }
+
+  // Step 1: country pick
+  document.querySelectorAll('.country-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const c = btn.dataset.country;
+      // Verificar que ese pais tenga submissions abiertas
+      const open = stateSnapshot?.countries?.[c]?.submissionsOpen;
+      if (!open) {
+        setError(1, c === 'cuba' ? 'Inscripciones de Cuba cerradas.' : 'Inscripciones de Puerto Rico cerradas.');
+        return;
+      }
+      const cap = stateSnapshot?.submissionsCap || 50;
+      const total = stateSnapshot?.countries?.[c]?.counts?.total || 0;
+      if (total >= cap) {
+        setError(1, `Las inscripciones de ${c === 'cuba' ? 'Cuba' : 'PR'} llegaron al cap (${cap}). Gracias.`);
+        return;
+      }
+      data.country = c;
+      document.querySelectorAll('.country-btn').forEach(b => b.classList.toggle('selected', b === btn));
+      $('btn-next-1').disabled = false;
+      setError(1, '');
+    });
+  });
+
+  $('btn-next-1').addEventListener('click', () => {
+    if (!data.country) { setError(1, 'Elegí tu pais.'); return; }
+    setStep(2);
+  });
+
+  // Step 2: name + IG
+  $('btn-back-2').addEventListener('click', () => setStep(1));
+  $('btn-next-2').addEventListener('click', () => {
+    const name = $('name').value.trim();
+    const ig   = $('instagram').value.trim().replace(/^@+/, '');
+    if (name.length < 2) { setError(2, 'El nombre es muy corto.'); return; }
+    if (name.length > 60) { setError(2, 'El nombre es muy largo (max 60).'); return; }
+    data.name = name;
+    data.instagram = ig;
+    setError(2, '');
+    setStep(3);
+  });
+
+  // Step 3: URL + submit
+  $('btn-back-3').addEventListener('click', () => setStep(2));
+  $('mediaUrl').addEventListener('input', () => {
+    data.mediaUrl = $('mediaUrl').value.trim();
+    updateReview();
+  });
+
+  $('btn-submit').addEventListener('click', async () => {
+    setError(3, '');
+    const url = ($('mediaUrl').value || '').trim();
+    if (!url) { setError(3, 'Pega el link de tu cancion.'); return; }
+    if (!/^https?:\/\//i.test(url)) { setError(3, 'El link debe empezar con http o https.'); return; }
+    data.mediaUrl = url;
+
+    $('btn-submit').disabled = true;
+    $('btn-submit').textContent = 'ENVIANDO...';
+    try {
+      const res = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (!json.ok) {
+        setError(3, json.error || 'Error al enviar.');
+        $('btn-submit').disabled = false;
+        $('btn-submit').textContent = 'ENVIAR ✓';
+        return;
+      }
+      // success
+      $('formCard').classList.add('hidden');
+      $('successCard').classList.remove('hidden');
+    } catch (e) {
+      setError(3, 'Error de conexion.');
+      $('btn-submit').disabled = false;
+      $('btn-submit').textContent = 'ENVIAR ✓';
+    }
+  });
+
+  // Initial state
+  fetch('/api/state').then(r => r.json()).then(d => {
+    if (!d.ok) return;
+    stateSnapshot = d.state;
+    const cuba = stateSnapshot.countries.cuba;
+    const pr   = stateSnapshot.countries.pr;
+    const cubaOpen = cuba.submissionsOpen && cuba.counts.total < (stateSnapshot.submissionsCap || 50);
+    const prOpen   = pr.submissionsOpen   && pr.counts.total   < (stateSnapshot.submissionsCap || 50);
+
+    if (!cubaOpen && !prOpen) {
+      $('closedCard').classList.remove('hidden');
+    } else {
+      $('formCard').classList.remove('hidden');
+      // Actualizar texto de cierre por pais (informativo en step 1)
+      const closedNote = [];
+      if (!cubaOpen) closedNote.push('Cuba: cerrado');
+      if (!prOpen)   closedNote.push('PR: cerrado');
+      if (closedNote.length) {
+        $('step1-closed').textContent = closedNote.join(' · ');
+        $('step1-closed').classList.remove('hidden');
+      }
+    }
+  });
+})();
+</script>
+</body>
+</html>

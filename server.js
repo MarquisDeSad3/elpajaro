@@ -1,27 +1,53 @@
 /**
  * El Pajaro — server principal.
  *
- * Levanta:
- *  - Express con rutas estaticas + API del host + OAuth Twitch
- *  - WebSocket pub/sub (overlay del show + panel del host suscriben aca)
- *  - Dos clientes IRC de Twitch (un canal cubano + un canal PR)
+ * Estructura de rutas:
  *
- * Uso local:
- *   1. cp .env.example .env  ;  llenar TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET, HOST_PIN
- *   2. npm install
- *   3. npm start
- *   4. abrir http://localhost:3000/host  (login con HOST_PIN)
- *   5. desde ahi conectar Twitch Cuba + Twitch PR
- *   6. abrir http://localhost:3000/show en otra pestana / Browser Source de OBS
+ *   /                    Landing publico dinamico
+ *   /enviar              Form publico de inscripcion (3 pasos mobile)
+ *   /panel/cuba          Panel Pablo (PIN -> role=cuba)
+ *   /panel/pr            Panel Kristoff (PIN -> role=pr)
+ *   /panel/master        Panel master (PIN -> role=master)
+ *   /show                Overlay del show (OBS Browser Source)
+ *
+ *   /api/submit          POST publico de inscripcion (URL only, 1 por IP)
+ *   /api/state           GET snapshot publico (para landing + show)
+ *   /api/admin/login     POST { pin, role }
+ *   /api/admin/validate  POST { token }
+ *   /api/admin/logout    POST { token }
+ *
+ *   /api/admin/:country/list                  GET submissions del pais
+ *   /api/admin/:country/approve               POST { id }
+ *   /api/admin/:country/reject                POST { id }
+ *   /api/admin/:country/elim/active           POST { id, durationMs }    (abre poll SI/NO en el chat)
+ *   /api/admin/:country/elim/active/close     POST                       (cierra el poll sin decidir)
+ *   /api/admin/:country/elim/decide           POST { id, decision }      ('passed'|'rejected')
+ *   /api/admin/:country/elim/clear            POST { id }                (volver a indeciso)
+ *   /api/admin/:country/lock                  POST { ids }               (8 IDs)
+ *   /api/admin/:country/unlock                POST
+ *   /api/admin/:country/submissions-toggle    POST { open }
+ *
+ *   /api/master/start-show       POST  (cuando ambos lockeados)
+ *   /api/master/reset-show       POST  (preserva submissions, deshace bracket)
+ *   /api/master/reset-all        POST  (purga todo)
+ *
+ *   /api/match/preview           POST { matchId }              (cualquier rol durante show)
+ *   /api/match/play-clip         POST { side, action }         (cualquier rol)
+ *   /api/match/voting/start      POST { durationMs }           (cualquier rol)
+ *   /api/match/voting/end        POST                          (cualquier rol)
+ *   /api/match/propose-decision  POST { matchId, winnerSide }  (solo cuba|pr — consenso 2-de-2)
+ *   /api/match/cancel-decision   POST                          (cualquier rol)
+ *
+ *   /api/twitch/auth?from=cuba|pr      OAuth start
+ *   /api/twitch/callback               OAuth callback
+ *   /api/twitch/status                 GET estado de las dos conexiones
  */
 
 try { require('dotenv').config(); } catch {}
 
 const http = require('http');
 const path = require('path');
-const fs = require('fs');
 const express = require('express');
-const multer = require('multer');
 const { WebSocketServer } = require('ws');
 
 const stateMod   = require('./lib/state');
@@ -29,6 +55,7 @@ const wsBus      = require('./lib/ws-broadcast');
 const hostAuth   = require('./lib/host-auth');
 const bracketMod = require('./lib/bracket');
 const voting     = require('./lib/voting');
+const subs       = require('./lib/submissions');
 const twitchOAuth = require('./lib/twitch-oauth');
 const { createIrcClient } = require('./lib/twitch-irc');
 
@@ -38,7 +65,8 @@ const BOT_NICK = process.env.TWITCH_BOT_NICK || 'elpajaro_bot';
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
 const app = express();
-app.use(express.json({ limit: '2mb' }));
+app.set('trust proxy', true);
+app.use(express.json({ limit: '128kb' }));
 app.use((req, _res, next) => {
   if (req.url.startsWith('/api/')) console.log('[HTTP]', req.method, req.url);
   next();
@@ -48,17 +76,22 @@ app.use((req, _res, next) => {
 stateMod.loadFromDisk();
 stateMod.setBroadcaster(wsBus.broadcast);
 
-/* ===== Voting init — necesita el broadcaster + ref al state + onTimeout ===== */
+/* ===== Voting init ===== */
 voting.init({
   broadcastFn: wsBus.broadcast,
   stateModule: stateMod,
-  onTimeoutFn: (matchId) => {
-    // Cuando se vence el timer, cambiamos la fase a 'result' pero NO
-    // cantamos ganador automatico — el host decide en base a las barras.
-    // (Si quisieramos auto-decidir por mayoria, se podria hacer aca.)
-    const cur = stateMod.state.currentMatch;
-    if (cur && cur.matchId === matchId && cur.phase === 'voting') {
-      stateMod.setCurrentMatch(matchId, 'result');
+  onTimeoutFn: (targetId, mode) => {
+    if (mode === 'duel') {
+      // Si era el duel del bracket, dejamos el match en fase 'result' para
+      // que el host decida (consenso 2-de-2). NO auto-decidimos por mayoria.
+      const cur = stateMod.state.currentMatch;
+      if (cur && cur.matchId === targetId && cur.phase === 'voting') {
+        stateMod.setCurrentMatch(targetId, 'result');
+      }
+    } else if (mode === 'binary') {
+      // Eliminacion fase 1 — al expirar el poll, dejamos la card abierta
+      // para que el admin del pais pulse PASA o NO PASA. No auto-decidimos.
+      // (Active phase1 card sigue tal cual, voting solo se cerro)
     }
   },
 });
@@ -68,40 +101,70 @@ const ircCuba = createIrcClient({
   origin: 'cuba',
   botNick: BOT_NICK,
   onMessage: (user, msg, origin) => voting.handleChat(user, msg, origin),
-  onStatus: ({ connected, login }) => {
-    stateMod.setTwitchConnection('cuba', { connected, login });
-  },
+  onStatus: ({ connected, login }) => stateMod.setTwitchConnection('cuba', { connected, login }),
 });
 const ircPr = createIrcClient({
   origin: 'pr',
   botNick: BOT_NICK,
   onMessage: (user, msg, origin) => voting.handleChat(user, msg, origin),
-  onStatus: ({ connected, login }) => {
-    stateMod.setTwitchConnection('pr', { connected, login });
-  },
+  onStatus: ({ connected, login }) => stateMod.setTwitchConnection('pr', { connected, login }),
 });
 
-/* ===== OAuth callback wiring ===== */
+/* ===== OAuth wiring ===== */
 twitchOAuth.setOnConnected((side, info) => {
   stateMod.setTwitchConnection(side, {
-    connected: true,
-    name: info.name,
-    login: info.broadcasterLogin,
+    connected: true, name: info.name, login: info.broadcasterLogin,
   });
   const ircClient = side === 'cuba' ? ircCuba : ircPr;
   ircClient.connect(info.accessToken, info.broadcasterLogin);
 });
 
-/* ===== Twitch OAuth routes ===== */
+/* ============================================================
+ * RUTAS
+ * ============================================================ */
+
+/* ===== Twitch OAuth ===== */
 app.get('/api/twitch/auth', twitchOAuth.authHandler);
 app.get('/api/twitch/callback', twitchOAuth.callbackHandler);
 app.get('/api/twitch/status', (_req, res) => {
   res.json({ ok: true, ...twitchOAuth.getStatus() });
 });
 
-/* ===== Host auth ===== */
+/* ===== Public state (para landing y show — sin auth) ===== */
+app.get('/api/state', (_req, res) => {
+  res.json({ ok: true, state: stateMod.snapshot(), poll: voting.getActive() });
+});
+
+/* ===== Public submission ===== */
+const submitRate = new Map();   // ip -> { count, resetAt }
+function submitThrottle(ip) {
+  const now = Date.now();
+  const e = submitRate.get(ip) || { count: 0, resetAt: now + 60_000 };
+  if (now > e.resetAt) { e.count = 0; e.resetAt = now + 60_000; }
+  e.count++;
+  submitRate.set(ip, e);
+  return e.count > 3;     // max 3 intentos por minuto por IP (ej. correcciones)
+}
+
+app.post('/api/submit', (req, res) => {
+  const ip = (req.ip || 'unknown').slice(0, 64);
+  if (submitThrottle(ip)) {
+    return res.status(429).json({ ok: false, error: 'Demasiados intentos. Espera un minuto.' });
+  }
+  const r = subs.createSubmission({
+    country: String(req.body?.country || ''),
+    name: req.body?.name,
+    instagram: req.body?.instagram,
+    mediaUrl: req.body?.mediaUrl,
+    ip,
+  });
+  if (!r.ok) return res.status(400).json({ ok: false, error: r.error });
+  res.json({ ok: true });
+});
+
+/* ===== Auth ===== */
 const loginRate = new Map();
-function loginRateLimited(ip) {
+function loginThrottle(ip) {
   const now = Date.now();
   const e = loginRate.get(ip) || { count: 0, resetAt: now + 60_000 };
   if (now > e.resetAt) { e.count = 0; e.resetAt = now + 60_000; }
@@ -110,200 +173,282 @@ function loginRateLimited(ip) {
   return e.count > 6;
 }
 
-app.post('/api/host/login', (req, res) => {
+app.post('/api/admin/login', (req, res) => {
   const ip = req.ip || 'unknown';
-  if (loginRateLimited(ip)) {
+  if (loginThrottle(ip)) {
     return res.status(429).json({ ok: false, error: 'Demasiados intentos. Espera un minuto.' });
   }
   const pin = String(req.body?.pin || '').trim();
-  const token = hostAuth.login(pin);
-  if (!token) return res.status(401).json({ ok: false, error: 'PIN incorrecto.' });
-  res.json({ ok: true, token, state: stateMod.snapshot() });
+  const role = String(req.body?.role || 'master');
+  const r = hostAuth.login(pin, role);
+  if (!r) return res.status(401).json({ ok: false, error: 'PIN incorrecto.' });
+  res.json({ ok: true, token: r.token, role: r.role, state: stateMod.snapshot() });
 });
 
-app.post('/api/host/validate', (req, res) => {
-  if (!hostAuth.requireHost(req, res)) return;
-  res.json({ ok: true, state: stateMod.snapshot() });
+app.post('/api/admin/validate', (req, res) => {
+  const session = hostAuth.requireRole(req, res);
+  if (!session) return;
+  res.json({ ok: true, role: session.role, state: stateMod.snapshot() });
 });
 
-app.post('/api/host/logout', (req, res) => {
+app.post('/api/admin/logout', (req, res) => {
   hostAuth.logout(String(req.body?.token || ''));
   res.json({ ok: true });
 });
 
-/* ===== Contestants + pairings ===== */
-function sanitizeContestant(raw) {
-  if (!raw || typeof raw !== 'object') return null;
-  const id = String(raw.id || '').slice(0, 32).replace(/[^A-Za-z0-9_-]/g, '');
-  const country = raw.country === 'pr' ? 'pr' : raw.country === 'cuba' ? 'cuba' : null;
-  if (!id || !country) return null;
-  return {
-    id,
-    name: String(raw.name || '').slice(0, 80),
-    country,
-    photoUrl: String(raw.photoUrl || '').slice(0, 500),
-    bio: String(raw.bio || '').slice(0, 300),
-    clipUrl: String(raw.clipUrl || '').slice(0, 500),
-    clipType: raw.clipType === 'video' ? 'video' : 'audio',
-  };
+/* ===== Helper: country admin guard =====
+ * cuba role accede solo a /api/admin/cuba/*. pr a /pr/*. master ve
+ * todos via endpoints distintos (no usa estos).
+ */
+function requireCountryAdmin(req, res, country) {
+  const session = hostAuth.requireRole(req, res, country);
+  return session ? session : null;
 }
 
-app.post('/api/host/contestants', (req, res) => {
-  if (!hostAuth.requireHost(req, res)) return;
-  const arr = Array.isArray(req.body?.contestants) ? req.body.contestants : null;
-  if (!arr) return res.status(400).json({ ok: false, error: 'Falta contestants[]' });
-  const cleaned = arr.map(sanitizeContestant).filter(Boolean);
-  if (cleaned.length !== 16) {
-    return res.status(400).json({ ok: false, error: `Se esperan 16 contestants, llegaron ${cleaned.length}.` });
-  }
-  // 8 cubanos + 8 PR — invariante del show.
-  const cubanos = cleaned.filter(c => c.country === 'cuba').length;
-  if (cubanos !== 8) {
-    return res.status(400).json({ ok: false, error: `Se esperan 8 cubanos y 8 puertorriqueños, llegaron ${cubanos} cubanos.` });
-  }
-  stateMod.setContestants(cleaned);
-  res.json({ ok: true, state: stateMod.snapshot() });
-});
+/* ===== Per-country admin endpoints (cuba, pr) ===== */
+function mountCountryRoutes(country) {
+  const guard = (req, res) => requireCountryAdmin(req, res, country);
 
-app.post('/api/host/pairings', (req, res) => {
-  if (!hostAuth.requireHost(req, res)) return;
-  const arr = Array.isArray(req.body?.pairings) ? req.body.pairings : null;
-  if (!arr || arr.length !== 8) {
-    return res.status(400).json({ ok: false, error: 'Se esperan 8 emparejamientos.' });
-  }
-  // Validar que cada par sea Cuba vs PR
-  const cs = stateMod.state.contestants;
-  for (let i = 0; i < 8; i++) {
-    const p = arr[i];
-    if (!p || !p.leftId || !p.rightId) return res.status(400).json({ ok: false, error: `Par ${i+1} incompleto.` });
-    const a = cs[p.leftId], b = cs[p.rightId];
-    if (!a || !b) return res.status(400).json({ ok: false, error: `Par ${i+1}: contestant invalido.` });
-    if (a.country === b.country) return res.status(400).json({ ok: false, error: `Par ${i+1}: octofinal debe ser Cuba vs PR.` });
-  }
-  stateMod.setPairings(arr);
-  res.json({ ok: true, state: stateMod.snapshot() });
-});
+  // POST en vez de GET para que el token vaya en body (consistente con resto)
+  app.post(`/api/admin/${country}/list`, (req, res) => {
+    if (!guard(req, res)) return;
+    const items = subs.listByCountry(country);
+    res.json({ ok: true, items, counts: stateMod.countSubmissions(country) });
+  });
 
-/* ===== Bracket ===== */
-app.post('/api/host/bracket/build', (req, res) => {
-  if (!hostAuth.requireHost(req, res)) return;
-  if (!stateMod.state.pairings || stateMod.state.pairings.length !== 8) {
-    return res.status(400).json({ ok: false, error: 'Falta configurar las 8 emparejamientos.' });
-  }
-  const bracket = bracketMod.buildEmptyBracket();
-  const r = bracketMod.applyPairings(bracket, stateMod.state.pairings);
-  if (!r.ok) return res.status(400).json({ ok: false, error: r.error });
-  stateMod.setBracket(bracket);
-  res.json({ ok: true, state: stateMod.snapshot() });
-});
+  app.post(`/api/admin/${country}/approve`, (req, res) => {
+    if (!guard(req, res)) return;
+    const r = subs.approve(String(req.body?.id || ''));
+    if (!r.ok) return res.status(400).json({ ok: false, error: r.error });
+    res.json({ ok: true });
+  });
 
-app.post('/api/host/reset', (req, res) => {
-  if (!hostAuth.requireHost(req, res)) return;
-  voting.endNow();
-  stateMod.reset();
+  app.post(`/api/admin/${country}/reject`, (req, res) => {
+    if (!guard(req, res)) return;
+    const r = subs.reject(String(req.body?.id || ''));
+    if (!r.ok) return res.status(400).json({ ok: false, error: r.error });
+    res.json({ ok: true });
+  });
+
+  app.post(`/api/admin/${country}/elim/active`, (req, res) => {
+    if (!guard(req, res)) return;
+    const id = String(req.body?.id || '');
+    const s = stateMod.getSubmission(id);
+    if (!s || s.country !== country) {
+      return res.status(400).json({ ok: false, error: 'Submission no encontrada o de otro pais.' });
+    }
+    if (s.status !== 'approved') {
+      return res.status(400).json({ ok: false, error: 'Hay que aprobarla antes.' });
+    }
+    voting.endNow();
+    stateMod.setActivePhase1Card(country, id);
+    const durationMs = Math.min(300_000, Math.max(10_000, parseInt(req.body?.durationMs, 10) || DEFAULT_VOTE_MS));
+    voting.start({ mode: 'binary', targetId: id, durationMs });
+    res.json({ ok: true });
+  });
+
+  app.post(`/api/admin/${country}/elim/active/close`, (req, res) => {
+    if (!guard(req, res)) return;
+    voting.endNow();
+    stateMod.setActivePhase1Card(null);
+    res.json({ ok: true });
+  });
+
+  app.post(`/api/admin/${country}/elim/decide`, (req, res) => {
+    if (!guard(req, res)) return;
+    const id = String(req.body?.id || '');
+    const decision = String(req.body?.decision || '');
+    const s = stateMod.getSubmission(id);
+    if (!s || s.country !== country) {
+      return res.status(400).json({ ok: false, error: 'Submission invalida.' });
+    }
+    const r = subs.decideElimination(id, decision);
+    if (!r.ok) return res.status(400).json({ ok: false, error: r.error });
+    voting.endNow();
+    if (stateMod.state.activePhase1Card?.cardId === id) {
+      stateMod.setActivePhase1Card(null);
+    }
+    res.json({ ok: true });
+  });
+
+  app.post(`/api/admin/${country}/elim/clear`, (req, res) => {
+    if (!guard(req, res)) return;
+    const r = subs.clearElimination(String(req.body?.id || ''));
+    if (!r.ok) return res.status(400).json({ ok: false, error: r.error });
+    res.json({ ok: true });
+  });
+
+  app.post(`/api/admin/${country}/lock`, (req, res) => {
+    if (!guard(req, res)) return;
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
+    const r = subs.lockTeam(country, ids);
+    if (!r.ok) return res.status(400).json({ ok: false, error: r.error });
+    res.json({ ok: true });
+  });
+
+  app.post(`/api/admin/${country}/unlock`, (req, res) => {
+    if (!guard(req, res)) return;
+    if (stateMod.state.showStarted) {
+      return res.status(400).json({ ok: false, error: 'No se puede desbloquear con el show ya empezado.' });
+    }
+    stateMod.unlockTeam(country);
+    res.json({ ok: true });
+  });
+
+  app.post(`/api/admin/${country}/submissions-toggle`, (req, res) => {
+    if (!guard(req, res)) return;
+    stateMod.setSubmissionsOpen(country, !!req.body?.open);
+    res.json({ ok: true });
+  });
+}
+mountCountryRoutes('cuba');
+mountCountryRoutes('pr');
+
+/* ===== Master endpoints ===== */
+function requireMaster(req, res) {
+  return hostAuth.requireRole(req, res, 'master');
+}
+
+app.post('/api/master/start-show', (req, res) => {
+  if (!requireMaster(req, res)) return;
+  const cuba = stateMod.state.countries.cuba;
+  const pr   = stateMod.state.countries.pr;
+  if (!cuba.teamLocked || cuba.lockedTeam.length !== 8) {
+    return res.status(400).json({ ok: false, error: 'Cuba no cerro su equipo de 8.' });
+  }
+  if (!pr.teamLocked || pr.lockedTeam.length !== 8) {
+    return res.status(400).json({ ok: false, error: 'Puerto Rico no cerro su equipo de 8.' });
+  }
+  const shuffle = !!req.body?.shuffle;
+  const built = bracketMod.buildFromTeams(cuba.lockedTeam, pr.lockedTeam, { shuffle });
+  if (!built.ok) return res.status(400).json({ ok: false, error: built.error });
+
+  // Mapear submissions -> contestants para que el bracket sepa nombre+url+etc
+  const contestants = {};
+  for (const id of [...cuba.lockedTeam, ...pr.lockedTeam]) {
+    const s = stateMod.getSubmission(id);
+    if (!s) continue;
+    contestants[id] = {
+      id: s.id,
+      name: s.name,
+      country: s.country,
+      photoUrl: '',           // sin foto en URL-only mode
+      bio: s.instagram ? '@' + s.instagram : '',
+      clipUrl: s.mediaUrl,
+      clipType: s.mediaType === 'audio' ? 'audio' : 'video',
+    };
+  }
+  stateMod.startShow(contestants, built.pairings, built.bracket);
   res.json({ ok: true });
 });
 
-/* ===== Match flow ===== */
-app.post('/api/host/match/preview', (req, res) => {
-  if (!hostAuth.requireHost(req, res)) return;
+app.post('/api/master/reset-show', (req, res) => {
+  if (!requireMaster(req, res)) return;
+  voting.endNow();
+  stateMod.resetShowOnly();
+  res.json({ ok: true });
+});
+
+app.post('/api/master/reset-all', (req, res) => {
+  if (!requireMaster(req, res)) return;
+  voting.endNow();
+  stateMod.resetEverything();
+  res.json({ ok: true });
+});
+
+/* ===== Match flow (cualquier rol durante el show) ===== */
+function requireAnyAdmin(req, res) {
+  return hostAuth.requireRole(req, res, null);
+}
+
+app.post('/api/match/preview', (req, res) => {
+  if (!requireAnyAdmin(req, res)) return;
   const matchId = String(req.body?.matchId || '');
   const m = stateMod.findMatch(matchId);
   if (!m) return res.status(400).json({ ok: false, error: 'Match no encontrado.' });
   if (m.status === 'done') return res.status(400).json({ ok: false, error: 'Match ya cerrado.' });
   if (!m.leftId || !m.rightId) {
-    return res.status(400).json({ ok: false, error: 'El match no tiene ambos contestantes (la ronda anterior no termino).' });
+    return res.status(400).json({ ok: false, error: 'El match no tiene ambos contestantes.' });
   }
-  voting.endNow();   // si habia votacion abierta, cerrarla
+  voting.endNow();
   stateMod.setCurrentMatch(matchId, 'preview');
   res.json({ ok: true });
 });
 
-app.post('/api/host/match/play-clip', (req, res) => {
-  if (!hostAuth.requireHost(req, res)) return;
+app.post('/api/match/play-clip', (req, res) => {
+  if (!requireAnyAdmin(req, res)) return;
   const side = req.body?.side === 'right' ? 'right' : 'left';
   const action = req.body?.action === 'pause' ? 'pause' : 'play';
-  // No tocamos state — solo emitimos un evento que el overlay traduce a play/pause del clip.
   wsBus.broadcast({ type: 'clip-control', side, action, ts: Date.now() });
   res.json({ ok: true });
 });
 
-app.post('/api/host/match/voting/start', (req, res) => {
-  if (!hostAuth.requireHost(req, res)) return;
+app.post('/api/match/voting/start', (req, res) => {
+  if (!requireAnyAdmin(req, res)) return;
   const cur = stateMod.state.currentMatch;
   if (!cur) return res.status(400).json({ ok: false, error: 'No hay match en preview.' });
   const durationMs = Math.min(300_000, Math.max(10_000, parseInt(req.body?.durationMs, 10) || DEFAULT_VOTE_MS));
   stateMod.setCurrentMatch(cur.matchId, 'voting', durationMs);
-  voting.start(cur.matchId, durationMs);
+  voting.start({ mode: 'duel', targetId: cur.matchId, durationMs });
   res.json({ ok: true });
 });
 
-app.post('/api/host/match/voting/end', (req, res) => {
-  if (!hostAuth.requireHost(req, res)) return;
+app.post('/api/match/voting/end', (req, res) => {
+  if (!requireAnyAdmin(req, res)) return;
   voting.endNow();
   const cur = stateMod.state.currentMatch;
   if (cur) stateMod.setCurrentMatch(cur.matchId, 'result');
   res.json({ ok: true });
 });
 
-app.post('/api/host/match/decide', (req, res) => {
-  if (!hostAuth.requireHost(req, res)) return;
+/**
+ * Consenso 2-de-2: cuba y pr cada uno propone un winnerSide. Cuando los
+ * dos coinciden, ejecutamos decideMatch.
+ */
+app.post('/api/match/propose-decision', (req, res) => {
+  const session = hostAuth.requireRole(req, res, null);
+  if (!session) return;
+  if (session.role !== 'cuba' && session.role !== 'pr') {
+    return res.status(403).json({ ok: false, error: 'Solo cuba y pr pueden votar la decision.' });
+  }
   const matchId = String(req.body?.matchId || '');
   const winnerSide = req.body?.winnerSide === 'right' ? 'right' : 'left';
-  if (!stateMod.state.bracket) {
-    return res.status(400).json({ ok: false, error: 'No hay bracket.' });
+  const m = stateMod.findMatch(matchId);
+  if (!m) return res.status(400).json({ ok: false, error: 'Match no encontrado.' });
+  if (m.status === 'done') return res.status(400).json({ ok: false, error: 'Match ya cerrado.' });
+
+  const r = stateMod.proposeDecision(matchId, session.role, winnerSide);
+  if (!r) return res.status(400).json({ ok: false, error: 'No se pudo registrar el voto.' });
+
+  if (r.consensus) {
+    // Ejecutar la decision
+    const out = bracketMod.decideMatch(stateMod.state.bracket, matchId, r.winnerSide);
+    if (!out.ok) {
+      stateMod.clearPendingDecision();
+      return res.status(400).json({ ok: false, error: out.error });
+    }
+    voting.endNow();
+    stateMod.recordHistory({
+      matchId, winnerId: out.match.winnerId, decidedAt: out.match.decidedAt,
+    });
+    stateMod.setCurrentMatch(null);
+    stateMod.clearPendingDecision();
+    return res.json({ ok: true, consensus: true, winnerId: out.match.winnerId });
   }
-  const r = bracketMod.decideMatch(stateMod.state.bracket, matchId, winnerSide);
-  if (!r.ok) return res.status(400).json({ ok: false, error: r.error });
-  voting.endNow();
-  // Snapshot del resultado para el log historico
-  const pollSnapshot = voting.getActive();
-  stateMod.recordHistory({
-    matchId, winnerId: r.match.winnerId, decidedAt: r.match.decidedAt, poll: pollSnapshot,
-  });
-  // Limpiamos currentMatch — el host abrira el siguiente cuando quiera
-  stateMod.setCurrentMatch(null);
-  res.json({ ok: true, state: stateMod.snapshot() });
+  res.json({ ok: true, consensus: false, votes: r.votes });
 });
 
-/* ===== Uploads (foto + clip) ===== */
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      const kind = file.fieldname === 'photo' ? 'contestants' : 'clips';
-      cb(null, path.join(PUBLIC_DIR, 'uploads', kind));
-    },
-    filename: (req, file, cb) => {
-      const safe = String(req.body.id || 'unknown').replace(/[^A-Za-z0-9_-]/g, '');
-      const ext = path.extname(file.originalname).toLowerCase().slice(0, 6);
-      cb(null, `${safe}_${Date.now()}${ext}`);
-    },
-  }),
-  limits: { fileSize: 50 * 1024 * 1024 },  // 50MB max por archivo (clip de video)
+app.post('/api/match/cancel-decision', (req, res) => {
+  if (!requireAnyAdmin(req, res)) return;
+  stateMod.clearPendingDecision();
+  res.json({ ok: true });
 });
 
-app.post('/api/host/upload', upload.fields([
-  { name: 'photo', maxCount: 1 },
-  { name: 'clip', maxCount: 1 },
-]), (req, res) => {
-  if (!hostAuth.validate(String(req.body?.token || ''))) {
-    return res.status(401).json({ ok: false, error: 'host-auth-required' });
-  }
-  const out = {};
-  if (req.files?.photo?.[0]) {
-    out.photoUrl = `/uploads/contestants/${req.files.photo[0].filename}`;
-  }
-  if (req.files?.clip?.[0]) {
-    const fn = req.files.clip[0];
-    out.clipUrl = `/uploads/clips/${fn.filename}`;
-    out.clipType = /\.(mp4|webm|mov|mkv)$/i.test(fn.originalname) ? 'video' : 'audio';
-  }
-  res.json({ ok: true, ...out });
-});
+/* ===== Compatibilidad: /host -> /panel/master ===== */
+app.get('/host', (_req, res) => res.redirect(301, '/panel/master'));
 
 /* ===== Static + page routes =====
- * OBS Browser Source cachea HTML agresivamente. Forzamos no-store en /show
- * para que un deploy nuevo se vea sin tener que refrescar la fuente.
+ * No-store en /show para que OBS Browser Source no cachee deploys viejos.
  */
 function noStore(_req, res, next) {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
@@ -312,12 +457,14 @@ function noStore(_req, res, next) {
   next();
 }
 
-app.get('/', (_req, res) => res.redirect('/show'));
+app.get('/', noStore, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'landing.html')));
+app.get('/enviar', noStore, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'enviar.html')));
+app.get('/panel/cuba', noStore, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'panel-country.html')));
+app.get('/panel/pr', noStore, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'panel-country.html')));
+app.get('/panel/master', noStore, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'panel-master.html')));
 app.get('/show', noStore, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'show.html')));
-app.get('/host', noStore, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'host.html')));
 
 app.use(express.static(PUBLIC_DIR));
-// Servir el JSON de ejemplo (si esta) — el panel del host lo fetchea via /data/...
 app.use('/data', express.static(path.join(__dirname, 'data')));
 
 /* ===== WebSocket ===== */
@@ -328,12 +475,7 @@ wss.on('connection', (ws) => {
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
 
-  // Cada cliente entra suscrito por defecto. Es mas simple que pedirles
-  // mandar { type: 'subscribe' } primero — el overlay y el host ambos
-  // necesitan recibir todo.
   wsBus.add(ws);
-
-  // Snapshot inicial
   try {
     ws.send(JSON.stringify({ type: 'state', state: stateMod.snapshot() }));
     const poll = voting.getActive();
@@ -343,13 +485,9 @@ wss.on('connection', (ws) => {
   ws.on('close', () => { wsBus.remove(ws); });
 });
 
-// Keep-alive: pings cada 20s, dropea sockets que no respondan.
 const keepAlive = setInterval(() => {
   for (const ws of wss.clients) {
-    if (ws.isAlive === false) {
-      try { ws.terminate(); } catch {}
-      continue;
-    }
+    if (ws.isAlive === false) { try { ws.terminate(); } catch {} continue; }
     ws.isAlive = false;
     try { ws.ping(); } catch {}
   }
@@ -360,13 +498,15 @@ wss.on('close', () => clearInterval(keepAlive));
 server.listen(PORT, () => {
   console.log(`\n┌────────────────────────────────────────────┐`);
   console.log(`│  El Pajaro corriendo en :${PORT}              │`);
-  console.log(`│  Show:  http://localhost:${PORT}/show          │`);
-  console.log(`│  Host:  http://localhost:${PORT}/host          │`);
+  console.log(`│  /                landing                  │`);
+  console.log(`│  /enviar          form publico             │`);
+  console.log(`│  /panel/cuba      Pablo (PIN)              │`);
+  console.log(`│  /panel/pr        Kristoff (PIN)           │`);
+  console.log(`│  /panel/master    master (PIN)             │`);
+  console.log(`│  /show            overlay OBS              │`);
   console.log(`└────────────────────────────────────────────┘\n`);
-  if (!process.env.HOST_PIN) {
-    console.warn('[BOOT] HOST_PIN no esta seteado — nadie podra entrar al panel del host.');
-  }
+  if (!process.env.HOST_PIN) console.warn('[BOOT] HOST_PIN no esta seteado.');
   if (!process.env.TWITCH_CLIENT_ID || !process.env.TWITCH_CLIENT_SECRET) {
-    console.warn('[BOOT] Faltan TWITCH_CLIENT_ID/SECRET — la conexion a Twitch no va a funcionar.');
+    console.warn('[BOOT] Faltan TWITCH_CLIENT_ID/SECRET.');
   }
 });

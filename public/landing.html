@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>El Pajaro — Cuba · Puerto Rico</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Archivo+Black&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/common.css" />
+  <style>
+    .landing-wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 20px 80px;
+      position: relative; z-index: 1;
+    }
+    .verse {
+      font-family: 'Inter', sans-serif;
+      font-style: italic;
+      font-size: 1rem;
+      max-width: 640px;
+      margin: 0 auto 32px;
+      text-align: center;
+      color: var(--paper-2);
+      line-height: 1.5;
+    }
+    .verse-author {
+      display: block;
+      margin-top: 6px;
+      font-style: normal;
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .75rem; letter-spacing: 3px;
+      color: var(--accent-yellow);
+    }
+    .countries-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    @media (max-width: 720px) { .countries-grid { grid-template-columns: 1fr; } }
+    .country-card { padding: 18px; }
+    .country-card h2 {
+      font-size: 2.2rem;
+      margin-bottom: 8px;
+      color: var(--ink);
+    }
+    .country-card .stat-row {
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .9rem;
+      padding: 6px 0;
+      border-bottom: 2px dashed rgba(0,0,0,.15);
+    }
+    .country-card .stat-row:last-child { border-bottom: 0; }
+    .country-card .stat-row .num { font-size: 1.4rem; }
+
+    .progress-bar {
+      width: 100%; height: 12px;
+      background: rgba(0,0,0,.1);
+      border: 2px solid var(--ink);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .progress-bar > div { height: 100%; transition: width .4s; }
+    .progress-bar.cuba > div { background: var(--cuba); }
+    .progress-bar.pr   > div { background: var(--pr); }
+
+    .locked-team {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      margin-top: 10px;
+      font-size: .75rem;
+    }
+    .locked-team .name {
+      background: white; border: 2px solid var(--ink);
+      padding: 2px 6px; border-radius: 4px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .locked-team-empty {
+      font-style: italic; color: #666; font-size: .85rem; margin-top: 6px;
+    }
+
+    .cta-section {
+      text-align: center;
+      padding: 32px 20px;
+      background: rgba(255, 216, 74, .08);
+      border: 4px dashed var(--accent-yellow);
+      border-radius: 16px;
+      margin-bottom: 24px;
+    }
+    .cta-section h3 {
+      font-size: 2rem;
+      color: var(--accent-yellow);
+      -webkit-text-stroke: 1px var(--ink);
+      margin-bottom: 8px;
+    }
+    .cta-closed { color: var(--paper-2); font-size: .95rem; }
+
+    .show-active-banner {
+      background: var(--accent-yellow);
+      color: var(--ink);
+      padding: 24px;
+      border: 5px solid var(--ink);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .show-active-banner h2 {
+      font-size: 2.6rem; margin-bottom: 8px;
+    }
+
+    .footer-link {
+      text-align: center; margin-top: 40px;
+      font-size: .8rem;
+    }
+    .footer-link a {
+      color: var(--paper-2); text-decoration: none;
+      border-bottom: 2px dashed var(--paper-2);
+    }
+  </style>
+</head>
+<body>
+<div class="halftone-bg"></div>
+
+<div class="landing-wrap">
+
+  <div class="title-wrap">
+    <div class="title-kicker">El Pajaro</div>
+    <h1 class="title-main"><span class="cuba">CUBA</span> <span class="amp">·</span> <span class="pr">PUERTO RICO</span></h1>
+    <div class="title-sub">Show de votacion entre cantantes emergentes</div>
+  </div>
+
+  <p class="verse">
+    "Cuba y Puerto Rico son de un pajaro las dos alas,
+    reciben flores y balas sobre el mismo corazon."
+    <span class="verse-author">Lola Rodriguez de Tio · 1893</span>
+  </p>
+
+  <div id="show-active" class="show-active-banner hidden">
+    <h2>¡EL SHOW ESTA EN VIVO!</h2>
+    <p>El bracket se esta jugando ahora mismo.</p>
+    <a href="/show" class="btn btn-big" style="margin-top:12px; background:var(--ink); color:var(--accent-yellow);">
+      VER EN VIVO →
+    </a>
+  </div>
+
+  <div class="countries-grid">
+    <div class="card card-cuba country-card">
+      <h2 style="color: var(--cuba);">CUBA</h2>
+      <div class="stat-row">
+        <span>Inscripciones</span>
+        <span><span class="num" id="cuba-count">0</span> <span class="text-muted" id="cuba-cap-suffix" style="color:#666;">/ 50</span></span>
+      </div>
+      <div class="progress-bar cuba"><div id="cuba-progress" style="width:0%"></div></div>
+      <div class="stat-row">
+        <span>Inscripciones abiertas</span>
+        <span id="cuba-open">—</span>
+      </div>
+      <div class="stat-row">
+        <span>Equipo de 8</span>
+        <span id="cuba-team-status">—</span>
+      </div>
+      <div id="cuba-team-list" class="locked-team"></div>
+    </div>
+
+    <div class="card card-pr country-card">
+      <h2 style="color: var(--pr);">PUERTO RICO</h2>
+      <div class="stat-row">
+        <span>Inscripciones</span>
+        <span><span class="num" id="pr-count">0</span> <span class="text-muted" id="pr-cap-suffix" style="color:#666;">/ 50</span></span>
+      </div>
+      <div class="progress-bar pr"><div id="pr-progress" style="width:0%"></div></div>
+      <div class="stat-row">
+        <span>Inscripciones abiertas</span>
+        <span id="pr-open">—</span>
+      </div>
+      <div class="stat-row">
+        <span>Equipo de 8</span>
+        <span id="pr-team-status">—</span>
+      </div>
+      <div id="pr-team-list" class="locked-team"></div>
+    </div>
+  </div>
+
+  <div id="cta" class="cta-section">
+    <h3>¿SOS CANTANTE EMERGENTE?</h3>
+    <p>Manda tu cancion. Cuba o Puerto Rico, da igual de donde sos. Si tenes flow, mandalo.</p>
+    <a href="/enviar" id="cta-link" class="btn btn-big btn-yellow" style="margin-top:14px;">
+      ENVIA TU CANCION →
+    </a>
+    <div id="cta-closed" class="cta-closed hidden" style="margin-top:14px;">
+      Inscripciones cerradas en ambos paises. Esperá la siguiente edicion.
+    </div>
+  </div>
+
+  <div class="footer-link">
+    <a href="/panel/master">Entrar al panel del show →</a>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  let cap = 50;
+
+  function pct(n) { return Math.min(100, Math.round((n / cap) * 100)); }
+
+  function fmtBool(b) {
+    return b
+      ? '<span class="badge badge-green">SI</span>'
+      : '<span class="badge badge-gray">NO</span>';
+  }
+
+  function render(state) {
+    cap = state.submissionsCap || 50;
+
+    // Show active banner
+    if (state.showStarted) {
+      $('show-active').classList.remove('hidden');
+    } else {
+      $('show-active').classList.add('hidden');
+    }
+
+    // Cuba stats
+    const cuba = state.countries.cuba;
+    $('cuba-count').textContent = cuba.counts.total;
+    $('cuba-cap-suffix').textContent = `/ ${cap}`;
+    $('cuba-progress').style.width = pct(cuba.counts.total) + '%';
+    $('cuba-open').innerHTML = fmtBool(cuba.submissionsOpen);
+    $('cuba-team-status').innerHTML = cuba.teamLocked
+      ? '<span class="badge badge-cuba">8 LISTOS</span>'
+      : '<span class="badge badge-gray">no cerrado</span>';
+    if (cuba.teamLocked && cuba.lockedTeam.length) {
+      $('cuba-team-list').innerHTML = cuba.lockedTeam.map(id => {
+        const c = state.contestants?.[id];
+        return `<div class="name">${c ? escapeHtml(c.name) : id.slice(0,6)}</div>`;
+      }).join('');
+    } else {
+      $('cuba-team-list').innerHTML = '';
+    }
+
+    // PR stats
+    const pr = state.countries.pr;
+    $('pr-count').textContent = pr.counts.total;
+    $('pr-cap-suffix').textContent = `/ ${cap}`;
+    $('pr-progress').style.width = pct(pr.counts.total) + '%';
+    $('pr-open').innerHTML = fmtBool(pr.submissionsOpen);
+    $('pr-team-status').innerHTML = pr.teamLocked
+      ? '<span class="badge badge-pr">8 LISTOS</span>'
+      : '<span class="badge badge-gray">no cerrado</span>';
+    if (pr.teamLocked && pr.lockedTeam.length) {
+      $('pr-team-list').innerHTML = pr.lockedTeam.map(id => {
+        const c = state.contestants?.[id];
+        return `<div class="name">${c ? escapeHtml(c.name) : id.slice(0,6)}</div>`;
+      }).join('');
+    } else {
+      $('pr-team-list').innerHTML = '';
+    }
+
+    // CTA
+    const allClosed = !cuba.submissionsOpen && !pr.submissionsOpen;
+    $('cta-link').classList.toggle('hidden', allClosed);
+    $('cta-closed').classList.toggle('hidden', !allClosed);
+  }
+
+  function escapeHtml(s) {
+    return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // Cargar estado inicial via REST y suscribirse al WS
+  fetch('/api/state').then(r => r.json()).then(d => { if (d.ok) render(d.state); });
+
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${location.host}`);
+    ws.onmessage = (ev) => {
+      let m; try { m = JSON.parse(ev.data); } catch { return; }
+      if (m.type === 'state') render(m.state);
+    };
+    ws.onclose = () => setTimeout(connect, 2000);
+    ws.onerror = () => {};
+  }
+  connect();
+})();
+</script>
+</body>
+</html>
