@@ -82,38 +82,31 @@ html, body {
   display: grid;
   place-items: center;
 }
+/* Pajaro como background image — usa una mascara CSS asi podemos
+   colorear el silueta con cualquier gradiente o color solido sin tocar
+   el PNG original (que es negro). */
 #bird {
+  position: absolute; inset: 0;
   width: 100vw;
   height: 100vh;
-  filter: drop-shadow(10px 14px 0 rgba(0,0,0, .35));
+  z-index: 1;
+  -webkit-mask: url('/img/bird.png') center/85% auto no-repeat;
+          mask: url('/img/bird.png') center/85% auto no-repeat;
+  background:
+    linear-gradient(160deg, var(--paper-warm, #fff5dd) 0%, var(--paper, #f9f1dc) 60%, #d8c898 100%);
+  filter: drop-shadow(10px 14px 18px rgba(0, 0, 0, .55));
 }
-.bird-silhouette, .bird-head, .bird-crest {
-  fill: var(--bird-fill);
-  stroke: var(--bird-stroke);
-  stroke-width: 5;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-.bird-beak {
-  fill: var(--accent-yellow);
-  stroke: var(--bird-stroke);
-  stroke-width: 4;
-  stroke-linejoin: round;
-}
-.bird-eye      { fill: var(--ink); }
-.bird-eye-shine { fill: white; }
-.feather-lines path {
-  fill: none;
-  stroke: var(--feather);
-  stroke-width: 4;
-  stroke-linecap: round;
-  opacity: .55;
+/* Capa con el corazon — encima del pajaro, debajo del bracket */
+#bird-heart {
+  position: absolute; inset: 0;
+  width: 100vw; height: 100vh;
+  z-index: 2; pointer-events: none;
 }
 .heart path {
   fill: var(--pr);
   stroke: var(--ink);
   stroke-width: 5;
-  filter: drop-shadow(3px 3px 0 var(--ink));
+  filter: drop-shadow(3px 3px 0 var(--ink)) drop-shadow(0 0 14px rgba(255, 61, 87, .6));
   transition: transform 0.6s cubic-bezier(.34,1.56,.64,1);
 }
 .heart {
@@ -122,8 +115,8 @@ html, body {
 }
 .heart.beating { animation: beat 1.2s ease-in-out infinite; }
 @keyframes beat {
-  0%, 100% { transform: translate(800px, 460px) scale(1); }
-  50%      { transform: translate(800px, 460px) scale(1.22); }
+  0%, 100% { transform: translate(800px, 440px) scale(1); }
+  50%      { transform: translate(800px, 440px) scale(1.22); }
 }
 
 /* ---- Bracket layer ---- */
