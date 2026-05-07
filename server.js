@@ -146,20 +146,27 @@ function submitThrottle(ip) {
   return e.count > 3;     // max 3 intentos por minuto por IP (ej. correcciones)
 }
 
-app.post('/api/submit', (req, res) => {
+app.post('/api/submit', async (req, res) => {
   const ip = (req.ip || 'unknown').slice(0, 64);
   if (submitThrottle(ip)) {
     return res.status(429).json({ ok: false, error: 'Demasiados intentos. Espera un minuto.' });
   }
-  const r = subs.createSubmission({
-    country: String(req.body?.country || ''),
-    name: req.body?.name,
-    instagram: req.body?.instagram,
-    mediaUrl: req.body?.mediaUrl,
-    ip,
-  });
-  if (!r.ok) return res.status(400).json({ ok: false, error: r.error });
-  res.json({ ok: true });
+  // createSubmission ahora es async (hace fetch a noembed.com para conseguir
+  // thumbnails de plataformas que no las exponen directo).
+  try {
+    const r = await subs.createSubmission({
+      country: String(req.body?.country || ''),
+      name: req.body?.name,
+      instagram: req.body?.instagram,
+      mediaUrl: req.body?.mediaUrl,
+      ip,
+    });
+    if (!r.ok) return res.status(400).json({ ok: false, error: r.error });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[SUBMIT] error:', e.message);
+    res.status(500).json({ ok: false, error: 'Error interno.' });
+  }
 });
 
 /* ===== Auth ===== */

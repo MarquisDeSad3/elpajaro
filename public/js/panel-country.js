@@ -346,18 +346,30 @@
       const decisionTxt = s.eliminationDecision === 'passed' ? '✓ PASÓ'
                        : s.eliminationDecision === 'rejected' ? '✗ FUERA' : '— pendiente —';
 
-      // Thumbnail: si tenemos URL real (YouTube/Vimeo), mostrar imagen. Si
-      // no, mostrar un icono segun la plataforma.
-      const thumbStyle = s.clipThumbnail ? `background-image:url('${escapeAttr(s.clipThumbnail)}')` : '';
-      const platformIcon = platformIconFor(s.clipPlatform);
-      const platformTag  = s.clipPlatform && s.clipPlatform !== 'iframe' && s.clipPlatform !== 'link'
-        ? `<span class="platform-tag">${escapeHtml(s.clipPlatform)}</span>` : '';
+      // Thumbnail layout: SIEMPRE renderizamos el fallback gradient + icono
+      // como capa de fondo. Si hay clipThumbnail, ponemos un <img> arriba
+      // que se carga lazy. Si la img falla a cargar O es muy chica
+      // (placeholder de YouTube unavailable: 120x90), agregamos clase
+      // 'failed' que la oculta y deja visible el fallback gradient debajo.
+      const platform = s.clipPlatform || 'link';
+      const platformIcon = platformIconFor(platform);
+      const imgTag = s.clipThumbnail
+        ? `<img src="${escapeAttr(s.clipThumbnail)}" alt="" loading="lazy"
+             onload="if(this.naturalWidth<200)this.classList.add('failed')"
+             onerror="this.classList.add('failed')" />`
+        : '';
+      const platformTag = platform && platform !== 'iframe' && platform !== 'link' && platform !== 'video' && platform !== 'audio'
+        ? `<span class="platform-tag">${escapeHtml(platform)}</span>` : '';
 
       return `
-        <div class="${cls.join(' ')}" data-id="${s.id}">
+        <div class="${cls.join(' ')}" data-id="${s.id}" data-country="${escapeAttr(role)}" data-platform="${escapeAttr(platform)}">
           <div class="num">#${i + 1}</div>
-          <div class="thumb" style="${thumbStyle}">
-            ${s.clipThumbnail ? '' : `<span class="thumb-icon">${platformIcon}</span>`}
+          <div class="thumb">
+            <div class="thumb-fallback">
+              <span class="thumb-icon">${platformIcon}</span>
+              <span class="thumb-platform-name">${escapeHtml(platform === 'link' ? 'link' : platform)}</span>
+            </div>
+            ${imgTag}
             ${platformTag}
           </div>
           <div class="body">

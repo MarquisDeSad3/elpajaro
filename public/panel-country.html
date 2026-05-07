@@ -261,15 +261,52 @@
     .p1-card .thumb {
       width: 100%;
       aspect-ratio: 16 / 9;
-      background: #14093b center/cover no-repeat;
       position: relative;
       border-bottom: 1px solid var(--glass-border);
+      overflow: hidden;
       display: flex; align-items: center; justify-content: center;
     }
+    .p1-card .thumb img {
+      width: 100%; height: 100%; object-fit: cover;
+      display: block;
+    }
+    .p1-card .thumb img.failed { display: none; }
+    /* Fallback: gradient bonito + icono platform centrado, animacion sutil */
+    .p1-card .thumb-fallback {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 6px;
+      background-size: 220% 220%;
+      animation: bgShift 8s ease-in-out infinite;
+    }
+    .p1-card[data-country="cuba"] .thumb-fallback {
+      background: linear-gradient(135deg, #1d8be0 0%, #2c1958 50%, #0a4f8c 100%);
+    }
+    .p1-card[data-country="pr"] .thumb-fallback {
+      background: linear-gradient(135deg, #d11d2d 0%, #2c1958 50%, #7a0e1a 100%);
+    }
+    /* Variantes por plataforma para variar */
+    .p1-card[data-platform="youtube"]    .thumb-fallback { background: linear-gradient(135deg, #ff0033 0%, #2c1958 50%, #5a0c18 100%); }
+    .p1-card[data-platform="tiktok"]     .thumb-fallback { background: linear-gradient(135deg, #00f2ea 0%, #2c1958 45%, #ff0050 100%); }
+    .p1-card[data-platform="instagram"]  .thumb-fallback { background: linear-gradient(135deg, #f09433 0%, #e6683c 30%, #dc2743 60%, #cc2366 80%, #bc1888 100%); }
+    .p1-card[data-platform="spotify"]    .thumb-fallback { background: linear-gradient(135deg, #1db954 0%, #14093b 60%, #0c0822 100%); }
+    .p1-card[data-platform="soundcloud"] .thumb-fallback { background: linear-gradient(135deg, #ff7700 0%, #2c1958 50%, #ff5500 100%); }
+    .p1-card[data-platform="vimeo"]      .thumb-fallback { background: linear-gradient(135deg, #1ab7ea 0%, #14093b 60%, #0c0822 100%); }
+    @keyframes bgShift {
+      0%, 100% { background-position: 0% 0%; }
+      50%      { background-position: 100% 100%; }
+    }
     .p1-card .thumb-icon {
-      font-size: 2.4rem;
-      filter: drop-shadow(0 4px 10px rgba(0,0,0,.5));
-      opacity: .85;
+      font-size: 3rem;
+      filter: drop-shadow(0 4px 14px rgba(0,0,0,.65));
+      opacity: .95;
+    }
+    .p1-card .thumb-platform-name {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: .68rem; letter-spacing: 2px;
+      color: rgba(255,255,255,.75);
+      text-transform: uppercase;
+      text-shadow: 0 2px 6px rgba(0,0,0,.5);
     }
     .p1-card .thumb::after {
       content: '▶';
