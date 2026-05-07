@@ -83,6 +83,36 @@
     toast._t = setTimeout(() => t.classList.remove('show'), ms);
   }
 
+  /**
+   * Beep sintetizado via Web Audio API (sin assets, sin descargas).
+   * Dos tonos: A5 (880Hz) → E6 (1320Hz). Brevemente, suave, no agresivo.
+   * Si el browser bloquea (sin user gesture previo), falla silenciosamente.
+   */
+  let _audioCtx = null;
+  function playReadySound() {
+    try {
+      _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = _audioCtx;
+      // Resume si esta suspendido (algunos browsers requieren gesture)
+      if (ctx.state === 'suspended') ctx.resume();
+      const tone = (freq, startOffset, dur, vol = 0.18) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        const t0 = ctx.currentTime + startOffset;
+        gain.gain.setValueAtTime(0, t0);
+        gain.gain.linearRampToValueAtTime(vol, t0 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+        osc.start(t0);
+        osc.stop(t0 + dur);
+      };
+      tone(880,  0,    0.20);
+      tone(1320, 0.12, 0.30);
+    } catch {}
+  }
+
   /* ===== Login =====
    * El master no sabe de antemano quien es el que se loguea — acepta los
    * dos PINs (cuba y pr) y el server le devuelve el rol asociado al pin
@@ -274,10 +304,27 @@
   }
 
   /* ===== Ready buttons ===== */
+  // Tracker para detectar transicion false→true del rol opuesto
+  let _prevReady = { cuba: false, pr: false };
+
   function renderReady() {
     const cuba = serverState?.countries?.cuba;
     const pr   = serverState?.countries?.pr;
     const myRole = session?.role;
+
+    // Detectar: el OTRO lado se acaba de poner listo y yo todavia no?
+    // Solo en vistas role-locked (cuando hay session.role)
+    if (!isPublicView && myRole) {
+      const cubaJustReady = cuba?.ready && !_prevReady.cuba;
+      const prJustReady   = pr?.ready   && !_prevReady.pr;
+      if (cubaJustReady && myRole === 'pr' && !pr?.ready) {
+        notifyOtherReady('CUBA', 'pr');
+      }
+      if (prJustReady && myRole === 'cuba' && !cuba?.ready) {
+        notifyOtherReady('PR', 'cuba');
+      }
+      _prevReady = { cuba: !!cuba?.ready, pr: !!pr?.ready };
+    }
 
     const btnCuba = $('ready-cuba');
     const btnPr   = $('ready-pr');
@@ -319,6 +366,20 @@
 
   $('ready-cuba').addEventListener('click', () => proposeReady('cuba'));
   $('ready-pr').addEventListener('click', () => proposeReady('pr'));
+
+  /**
+   * Notificacion cuando el OTRO lado se confirma listo y vos todavia no.
+   * Sonido + pulso fuerte en tu boton + toast grande.
+   */
+  function notifyOtherReady(otherName, myRoleSide) {
+    playReadySound();
+    const myBtn = myRoleSide === 'cuba' ? $('ready-cuba') : $('ready-pr');
+    if (myBtn) {
+      myBtn.classList.add('notify-pulse');
+      setTimeout(() => myBtn.classList.remove('notify-pulse'), 4500);
+    }
+    toast(`✨ ${otherName} LISTO — ahora vos`, 5000);
+  }
 
   async function proposeReady(country) {
     const current = !!serverState?.countries?.[country]?.ready;

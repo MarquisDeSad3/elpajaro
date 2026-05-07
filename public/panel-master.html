@@ -177,6 +177,17 @@
       0%, 100% { transform: translateY(0) scale(1); }
       50%      { transform: translateY(-2px) scale(1.02); }
     }
+    /* Pulso fuerte cuando el OTRO lado se pone listo y vos todavia no */
+    .ready-btn.notify-pulse {
+      animation: notifyPulse 1s ease-in-out 4;
+      box-shadow: 0 0 0 4px var(--gold), 0 0 40px var(--gold-glow), 0 0 80px var(--gold-glow) !important;
+    }
+    @keyframes notifyPulse {
+      0%, 100% { transform: translateY(0)  scale(1); }
+      25%      { transform: translateY(-5px) scale(1.06); }
+      50%      { transform: translateY(0)  scale(1); }
+      75%      { transform: translateY(-5px) scale(1.06); }
+    }
     .ready-status {
       font-family: 'Archivo Black', sans-serif;
       font-size: .8rem; letter-spacing: 2px;
