@@ -681,31 +681,32 @@
     }
   }
 
+  /**
+   * Barra unica de pelea (estilo TortillaTV):
+   *   - Izquierda crece desde la izquierda con el % de left/total
+   *   - Derecha crece desde la derecha con el % de right/total
+   *   - Si total=0, queda 50/50 (estado neutro)
+   *   - Suman 100% siempre, asi visualmente "se pelean" el espacio
+   * No hay desglose por canal de origen (cuba/pr) — eso es info interna,
+   * la audiencia solo necesita ver quien va ganando.
+   */
   function updateBars(poll) {
-    if (!poll || !poll.totals || !poll.votes) return;
+    if (!poll || !poll.totals) return;
     const t = poll.totals;
-    const grand = Math.max(1, t.grandTotal);
-
-    const leftBar  = $('vote-left-bar');
-    const rightBar = $('vote-right-bar');
-    if (leftBar) {
-      const cubaW = (poll.votes.cuba.left / grand * 100).toFixed(1);
-      const prW   = (poll.votes.pr.left   / grand * 100).toFixed(1);
-      leftBar.querySelector('.vote-bar-cuba').style.width = cubaW + '%';
-      leftBar.querySelector('.vote-bar-pr').style.width   = prW + '%';
+    const total = t.leftTotal + t.rightTotal;
+    let leftPct, rightPct;
+    if (total === 0) {
+      leftPct = 50; rightPct = 50;
+    } else {
+      leftPct = (t.leftTotal / total) * 100;
+      rightPct = 100 - leftPct;
     }
-    if (rightBar) {
-      const cubaW = (poll.votes.cuba.right / grand * 100).toFixed(1);
-      const prW   = (poll.votes.pr.right   / grand * 100).toFixed(1);
-      rightBar.querySelector('.vote-bar-cuba').style.width = cubaW + '%';
-      rightBar.querySelector('.vote-bar-pr').style.width   = prW + '%';
-    }
-    $('vote-left-cuba').textContent  = poll.votes.cuba.left;
-    $('vote-left-pr').textContent    = poll.votes.pr.left;
-    $('vote-left-total').textContent = t.leftTotal;
-    $('vote-right-cuba').textContent = poll.votes.cuba.right;
-    $('vote-right-pr').textContent   = poll.votes.pr.right;
-    $('vote-right-total').textContent= t.rightTotal;
+    const leftFill  = $('vote-left-fill');
+    const rightFill = $('vote-right-fill');
+    if (leftFill)  leftFill.style.width  = leftPct.toFixed(1) + '%';
+    if (rightFill) rightFill.style.width = rightPct.toFixed(1) + '%';
+    $('vote-left-total').textContent  = t.leftTotal;
+    $('vote-right-total').textContent = t.rightTotal;
   }
 
   function startVoteTimer(startedAt, deadlineAt) {

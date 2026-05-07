@@ -426,63 +426,87 @@
     }
     .vote-timer-text { color: var(--gold); min-width: 36px; text-align: right; }
 
-    /* Barras stacked: cada lado tiene un track con cuba+pr stacked dentro */
-    .vote-bars {
+    /* === Barra unica de pelea (estilo TortillaTV /concurso) ===
+     * Izquierda (1, azul) crece desde la izquierda. Derecha (2, rojo)
+     * crece desde la derecha. Se chocan en el medio = ratio de votos.
+     * Si no hay votos, las dos al 50% (estado neutro). */
+    .vote-fight-head {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-      align-items: stretch;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 16px;
+      align-items: baseline;
+      margin-bottom: 8px;
     }
-    .vote-bar-side {
-      display: flex; flex-direction: column; gap: 6px;
-      min-width: 0;
+    .vote-fight-head .side-label {
+      font-family: 'Bangers', cursive;
+      font-size: 1.4rem; letter-spacing: 1.5px;
+      line-height: 1.1;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .vote-bar-head {
-      display: flex; justify-content: space-between; align-items: baseline;
+    .vote-fight-head .side-label.left  { color: #4dc3ff; text-align: left;  filter: drop-shadow(0 0 8px rgba(77,195,255,.5)); }
+    .vote-fight-head .side-label.right { color: #ff5570; text-align: right; filter: drop-shadow(0 0 8px rgba(255,85,112,.5)); }
+    .vote-fight-head .side-label .num {
+      font-size: 1.1rem;
+      padding: 0 8px;
+      border-radius: 6px;
+      background: currentColor;
+    }
+    .vote-fight-head .side-label .num span {
+      color: var(--ink);
+      text-shadow: none;
+    }
+    .vote-fight-head .vs-mid {
       font-family: 'Archivo Black', sans-serif;
-      font-size: .72rem; letter-spacing: 1.5px;
+      font-size: .72rem; letter-spacing: 2px;
+      color: var(--muted);
     }
-    .vote-bar-head .label { color: var(--muted); }
-    .vote-bar-head .total { color: var(--text); font-size: 1rem; }
-    .vote-bar-wrap {
-      width: 100%; height: 22px;
-      background: rgba(0,0,0,.35);
-      border: 1px solid var(--glass-border);
+
+    .vote-fight-bar {
+      width: 100%; height: 36px;
+      background: rgba(0,0,0,.5);
+      border: 2px solid var(--glass-border);
       border-radius: 100px;
       overflow: hidden;
       display: flex;
+      position: relative;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,.4);
     }
-    .vote-bar-wrap > div {
-      height: 100%;
-      transition: width .25s ease-out;
+    .vote-fight-bar > .left-fill {
+      background: linear-gradient(90deg, #1e7fff 0%, #4dc3ff 100%);
+      box-shadow: inset 0 0 18px rgba(77,195,255,.6), 4px 0 12px rgba(77,195,255,.5);
+      transition: width .35s cubic-bezier(.4, 1.4, .5, 1);
+      width: 50%;
+      display: flex; align-items: center; justify-content: flex-start;
+      padding-left: 14px;
+      font-family: 'Archivo Black', sans-serif;
+      color: white;
+      font-size: 1rem;
+      text-shadow: 0 2px 6px rgba(0,0,0,.5);
     }
-    /* Las 2 capas stacked dentro de cada barra muestran de QUE chat
-       (cuba/pr) llego el voto — la barra entera ya esta posicionada en
-       el lado correcto del match (izq=1 azul / der=2 rojo), entonces el
-       desglose stacked usa tonos del color del lado, no del canal. */
-    .vote-bar-side.left  .vote-bar-cuba { background: linear-gradient(90deg, rgba(108,193,255,.6) 0%, #4dc3ff 100%); }
-    .vote-bar-side.left  .vote-bar-pr   { background: linear-gradient(90deg, rgba(45,169,255,.55) 0%, #1e7fff 100%); border-left: 1px dashed rgba(255,255,255,.25); }
-    .vote-bar-side.right .vote-bar-cuba { background: linear-gradient(90deg, rgba(255,124,141,.6) 0%, #ff5570 100%); }
-    .vote-bar-side.right .vote-bar-pr   { background: linear-gradient(90deg, rgba(255,61,87,.55) 0%, #d22442 100%); border-left: 1px dashed rgba(255,255,255,.25); }
-    .vote-bar-side.left  .vote-bar-wrap { box-shadow: inset 0 0 12px rgba(108,193,255,.3); }
-    .vote-bar-side.right .vote-bar-wrap { box-shadow: inset 0 0 12px rgba(255,124,141,.3); }
-    .vote-breakdown {
-      display: flex; gap: 10px; font-size: .68rem; color: var(--muted);
-      font-family: 'Archivo Black', sans-serif; letter-spacing: 1px;
+    .vote-fight-bar > .right-fill {
+      background: linear-gradient(90deg, #ff5570 0%, #d22442 100%);
+      box-shadow: inset 0 0 18px rgba(255,85,112,.6), -4px 0 12px rgba(255,85,112,.5);
+      transition: width .35s cubic-bezier(.4, 1.4, .5, 1);
+      width: 50%; margin-left: auto;
+      display: flex; align-items: center; justify-content: flex-end;
+      padding-right: 14px;
+      font-family: 'Archivo Black', sans-serif;
+      color: white;
+      font-size: 1rem;
+      text-shadow: 0 2px 6px rgba(0,0,0,.5);
     }
-    .vote-breakdown .pill {
-      display: inline-flex; align-items: center; gap: 4px;
-      padding: 2px 8px;
-      border: 1px solid var(--glass-border);
-      border-radius: 100px;
-      background: var(--glass);
+    /* Linea divisoria glow donde se encuentran los dos colores */
+    .vote-fight-bar::after {
+      content: '';
+      position: absolute;
+      top: 4px; bottom: 4px;
+      left: 50%; transform: translateX(-50%);
+      width: 2px;
+      background: rgba(255,255,255,.35);
+      box-shadow: 0 0 10px rgba(255,255,255,.7);
+      opacity: .6;
+      pointer-events: none;
     }
-    .vote-breakdown .dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      box-shadow: 0 0 6px currentColor;
-    }
-    .vote-breakdown .dot.cuba { background: var(--cuba); color: var(--cuba); }
-    .vote-breakdown .dot.pr   { background: var(--pr);   color: var(--pr); }
 
     /* Lluvia de nombres flotantes — quien voto por quien */
     .vote-rain {
@@ -717,35 +741,18 @@
             <div class="vote-timer-bar"><div class="vote-timer-fill" id="vote-timer-fill" style="width:100%"></div></div>
             <span class="vote-timer-text" id="vote-timer-text">—</span>
           </div>
-          <div class="vote-bars">
-            <div class="vote-bar-side left">
-              <div class="vote-bar-head">
-                <span class="label"><span style="color:#4dc3ff;">1 ·</span> <span id="vote-left-label">IZQUIERDA</span></span>
-                <span class="total"><span id="vote-left-total">0</span></span>
-              </div>
-              <div class="vote-bar-wrap" id="vote-left-bar">
-                <div class="vote-bar-cuba" style="width:0%"></div>
-                <div class="vote-bar-pr"   style="width:0%"></div>
-              </div>
-              <div class="vote-breakdown">
-                <span class="pill"><span class="dot cuba"></span>chat CUBA <span id="vote-left-cuba">0</span></span>
-                <span class="pill"><span class="dot pr"></span>chat PR <span id="vote-left-pr">0</span></span>
-              </div>
+          <div class="vote-fight-head">
+            <div class="side-label left">
+              <span class="num"><span>1</span></span> <span id="vote-left-label">—</span>
             </div>
-            <div class="vote-bar-side right">
-              <div class="vote-bar-head">
-                <span class="label"><span style="color:#ff5570;">2 ·</span> <span id="vote-right-label">DERECHA</span></span>
-                <span class="total"><span id="vote-right-total">0</span></span>
-              </div>
-              <div class="vote-bar-wrap" id="vote-right-bar">
-                <div class="vote-bar-cuba" style="width:0%"></div>
-                <div class="vote-bar-pr"   style="width:0%"></div>
-              </div>
-              <div class="vote-breakdown">
-                <span class="pill"><span class="dot cuba"></span>chat CUBA <span id="vote-right-cuba">0</span></span>
-                <span class="pill"><span class="dot pr"></span>chat PR <span id="vote-right-pr">0</span></span>
-              </div>
+            <div class="vs-mid">VS</div>
+            <div class="side-label right">
+              <span id="vote-right-label">—</span> <span class="num"><span>2</span></span>
             </div>
+          </div>
+          <div class="vote-fight-bar">
+            <div class="left-fill"  id="vote-left-fill"><span id="vote-left-total">0</span></div>
+            <div class="right-fill" id="vote-right-fill"><span id="vote-right-total">0</span></div>
           </div>
           <!-- Lluvia de nombres de Twitch (quien voto por quien) -->
           <div class="vote-rain" id="vote-rain"></div>
