@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>El Pajaro — Show</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Archivo+Black&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/show.css" />
+</head>
+<body>
+
+<!-- ==================== BACKDROP ==================== -->
+<div class="halftone"></div>
+<div class="banner-top">
+  <h1 class="banner-title"><span class="cuba">CUBA</span> <span class="amp">·</span> <span class="pr">PUERTO RICO</span></h1>
+  <div class="banner-sub">El Pajaro · Las dos alas · Un solo corazon</div>
+</div>
+
+<!-- ==================== STAGE: pajaro + bracket ==================== -->
+<div id="stage" class="stage">
+
+  <!-- Pajaro SVG (silueta simplificada estilo comic) -->
+  <svg id="bird" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <!-- Cuerpo central -->
+    <ellipse class="bird-fill" cx="800" cy="520" rx="58" ry="170" />
+    <!-- Cuello -->
+    <rect class="bird-fill" x="780" y="320" width="40" height="80" rx="14" />
+    <!-- Cabeza -->
+    <circle class="bird-fill" cx="800" cy="290" r="58" />
+    <!-- Pico -->
+    <polygon class="bird-beak" points="800,348 818,378 782,378" />
+    <!-- Ojo -->
+    <circle class="bird-eye" cx="800" cy="278" r="6" />
+    <!-- Ala izquierda — silueta curva tipo bandera -->
+    <path class="bird-wing wing-left"
+          d="M 760 410
+             Q 460 320, 220 380
+             Q 70 460, 60 530
+             Q 200 620, 380 620
+             Q 560 620, 760 600
+             Z" />
+    <!-- Ala derecha (mirror) -->
+    <path class="bird-wing wing-right"
+          d="M 840 410
+             Q 1140 320, 1380 380
+             Q 1530 460, 1540 530
+             Q 1400 620, 1220 620
+             Q 1040 620, 840 600
+             Z" />
+    <!-- Cola -->
+    <polygon class="bird-fill"
+             points="780,680 760,800 800,760 840,800 820,680" />
+    <!-- Plumas decorativas en alas (lineas) -->
+    <g class="feather-lines">
+      <path d="M 220 410 Q 380 480, 540 540" />
+      <path d="M 320 380 Q 460 460, 600 530" />
+      <path d="M 420 380 Q 540 460, 660 540" />
+      <path d="M 1380 410 Q 1220 480, 1060 540" />
+      <path d="M 1280 380 Q 1140 460, 1000 530" />
+      <path d="M 1180 380 Q 1060 460, 940 540" />
+    </g>
+    <!-- Corazon en el pecho (objetivo final del bracket) -->
+    <g id="heart" class="heart">
+      <path d="M 800 580
+               L 770 555 A 18 18 0 1 1 800 540
+               A 18 18 0 1 1 830 555
+               Z" />
+    </g>
+  </svg>
+
+  <!-- Capa absoluta donde se monta el bracket. Las posiciones de cada match
+       las pone show.js en base al layout fijo (4 rondas). -->
+  <div id="bracket-layer" class="bracket-layer"></div>
+
+  <!-- Conexiones SVG entre matches (lineas que se iluminan al avanzar). -->
+  <svg id="bracket-lines" class="bracket-lines" viewBox="0 0 1600 900" preserveAspectRatio="none"></svg>
+</div>
+
+<!-- ==================== MATCH MODAL ====================
+     Aparece cuando hay currentMatch. Se transforma segun phase. -->
+<div id="match-modal" class="match-modal hidden">
+  <div class="modal-inner">
+    <div class="phase-tag" id="phase-tag">PREVIEW</div>
+
+    <div class="versus">
+      <div class="contender" id="contender-left">
+        <div class="contender-photo"><img id="left-photo" alt="" /></div>
+        <div class="contender-info">
+          <div class="contender-flag flag-cuba" id="left-flag">CUBA</div>
+          <h2 class="contender-name" id="left-name">—</h2>
+          <p class="contender-bio" id="left-bio"></p>
+          <div class="contender-vote-cmd">!1 · <strong>cuba</strong></div>
+        </div>
+        <div class="clip-player" id="left-clip-wrap"></div>
+        <div class="vote-bar-wrap">
+          <div class="vote-bar-stack" id="left-bar">
+            <div class="vote-bar-cuba" style="width:0%"></div>
+            <div class="vote-bar-pr"   style="width:0%"></div>
+          </div>
+          <div class="vote-totals">
+            <span class="t-cuba">cuba: <span id="left-cuba-count">0</span></span>
+            <span class="t-pr">pr: <span id="left-pr-count">0</span></span>
+            <span class="t-total">TOTAL: <span id="left-total-count">0</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="vs-mark">VS</div>
+
+      <div class="contender" id="contender-right">
+        <div class="contender-photo"><img id="right-photo" alt="" /></div>
+        <div class="contender-info">
+          <div class="contender-flag flag-pr" id="right-flag">PR</div>
+          <h2 class="contender-name" id="right-name">—</h2>
+          <p class="contender-bio" id="right-bio"></p>
+          <div class="contender-vote-cmd">!2 · <strong>pr</strong></div>
+        </div>
+        <div class="clip-player" id="right-clip-wrap"></div>
+        <div class="vote-bar-wrap">
+          <div class="vote-bar-stack" id="right-bar">
+            <div class="vote-bar-cuba" style="width:0%"></div>
+            <div class="vote-bar-pr"   style="width:0%"></div>
+          </div>
+          <div class="vote-totals">
+            <span class="t-cuba">cuba: <span id="right-cuba-count">0</span></span>
+            <span class="t-pr">pr: <span id="right-pr-count">0</span></span>
+            <span class="t-total">TOTAL: <span id="right-total-count">0</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="vote-timer" id="vote-timer-wrap">
+      <div class="vote-timer-label">VOTAR EN EL CHAT · <strong>!1</strong> o <strong>!2</strong></div>
+      <div class="vote-timer-bar"><div class="vote-timer-fill" id="vote-timer-fill"></div></div>
+      <div class="vote-timer-text" id="vote-timer-text">--</div>
+    </div>
+
+    <div class="result-banner hidden" id="result-banner">
+      <span class="banner-bang">¡GANADOR!</span>
+      <span id="winner-name">—</span>
+    </div>
+
+    <!-- Lluvia de nombres flotantes con cada voto (decorativo) -->
+    <div class="vote-rain" id="vote-rain"></div>
+  </div>
+</div>
+
+<!-- ==================== STATUS BAR (debug discreto) ==================== -->
+<div class="status-bar" id="status-bar">
+  <span class="dot dot-cuba" id="dot-cuba"></span> CUBA
+  <span class="dot dot-pr" id="dot-pr"></span> PR
+  <span class="ws-status" id="ws-status">conectando…</span>
+</div>
+
+<script src="/js/show.js"></script>
+</body>
+</html>

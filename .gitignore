@@ -1,0 +1,20 @@
+node_modules/
+.env
+.env.local
+
+# Local uploads (clips/photos los suben los creadores en su panel)
+public/uploads/contestants/*
+public/uploads/clips/*
+!public/uploads/contestants/.gitkeep
+!public/uploads/clips/.gitkeep
+
+# Estado persistido local (cuando no hay Firebase)
+data/state.json
+data/contestants.json
+
+# OS / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

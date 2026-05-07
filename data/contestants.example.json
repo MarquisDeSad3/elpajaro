@@ -1,0 +1,146 @@
+[
+  {
+    "id": "cuba-1",
+    "country": "cuba",
+    "name": "Yenisey Valdes",
+    "bio": "Cantante de timba habanera, 24 anios. Estilo callejero.",
+    "photoUrl": "",
+    "clipUrl": "",
+    "clipType": "audio"
+  },
+  {
+    "id": "cuba-2",
+    "country": "cuba",
+    "name": "Reynel Pino",
+    "bio": "Trovador santiaguero. Guitarra acustica + voz rasposa.",
+    "photoUrl": "",
+    "clipUrl": "",
+    "clipType": "audio"
+  },
+  {
+    "id": "cuba-3",
+    "country": "cuba",
+    "name": "Lazara Mestre",
+    "bio": "Soprano lirica de Camaguey, mezcla bolero y gospel.",
+    "photoUrl": "",
+    "clipUrl": "",
+    "clipType": "audio"
+  },
+  {
+    "id": "cuba-4",
+    "country": "cuba",
+    "name": "Roberto Almaguer",
+    "bio": "Reggaeton con influencia trovera. De Cienfuegos.",
+    "photoUrl": "",
+    "clipUrl": "",
+    "clipType": "audio"
+  },
+  {
+    "id": "cuba-5",
+    "country": "cuba",
+    "name": "Mileidys Cabrera",
+    "bio": "Pop alternativo. Letras politicas y desafiantes.",
+    "photoUrl": "",
+    "clipUrl": "",
+    "clipType": "audio"
+  },
+  {
+    "id": "cuba-6",
+    "country": "cuba",
+    "name": "Yusniel Reyes",
+    "bio": "R&B cubano fusion. Voz tipo Frank Sinatra criolla.",
+    "photoUrl": "",
+    "clipUrl": "",
+    "clipType": "audio"
+  },
+  {
+    "id": "cuba-7",
+    "country": "cuba",
+    "name": "Daimara Suarez",
+    "bio": "Salsera matancera, tenor poderoso, baila tremendo.",
+    "photoUrl": "",
+    "clipUrl": "",
+    "clipType": "audio"
+  },
+  {
+    "id": "cuba-8",
+    "country": "cuba",
+    "name": "Adonis Carvajal",
+    "bio": "Rap consciente del Cerro. Beats minimalistas.",
+    "photoUrl": "",
+    "clipUrl": "",
+    "clipType": "audio"
+  },
+  {
+    "id": "pr-1",
+    "country": "pr",
+    "name": "Vianey Soto",
+    "bio": "Bachata urbana de Bayamon. 22 anios, viral en TikTok.",
+    "photoUrl": "",
+    "clipUrl": "",
+    "clipType": "audio"
+  },
+  {
+    "id": "pr-2",
+    "country": "pr",
+    "name": "Hector Burgos",
+    "bio": "Plena moderna mezcla con hip-hop. De Loiza.",
+    "photoUrl": "",
+    "clipUrl": "",
+    "clipType": "audio"
+  },
+  {
+    "id": "pr-3",
+    "country": "pr",
+    "name": "Glorymar Padilla",
+    "bio": "Voz suave estilo bolero contemporaneo. De Mayaguez.",
+    "photoUrl": "",
+    "clipUrl": "",
+    "clipType": "audio"
+  },
+  {
+    "id": "pr-4",
+    "country": "pr",
+    "name": "Damian Otero",
+    "bio": "Reggaeton clasico, productor y cantante. Carolina.",
+    "photoUrl": "",
+    "clipUrl": "",
+    "clipType": "audio"
+  },
+  {
+    "id": "pr-5",
+    "country": "pr",
+    "name": "Eunice Martinez",
+    "bio": "Pop con beats afrocaribenos. Influencias de Bad Bunny.",
+    "photoUrl": "",
+    "clipUrl": "",
+    "clipType": "audio"
+  },
+  {
+    "id": "pr-6",
+    "country": "pr",
+    "name": "Ramon Velez",
+    "bio": "Indie rock en espanol. Letras melancolicas.",
+    "photoUrl": "",
+    "clipUrl": "",
+    "clipType": "audio"
+  },
+  {
+    "id": "pr-7",
+    "country": "pr",
+    "name": "Yarelis Ortiz",
+    "bio": "Salsa romantica nueva escuela. Aguadilla.",
+    "photoUrl": "",
+    "clipUrl": "",
+    "clipType": "audio"
+  },
+  {
+    "id": "pr-8",
+    "country": "pr",
+    "name": "Joelvys Acevedo",
+    "bio": "Trap latino con elementos jazz. San Juan.",
+    "photoUrl": "",
+    "clipUrl": "",
+    "clipType": "audio"
+  }
+]

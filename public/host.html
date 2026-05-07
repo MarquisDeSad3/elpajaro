@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>El Pajaro — Host</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Archivo+Black&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/host.css" />
+</head>
+<body>
+
+<header class="host-header">
+  <h1><span class="cuba">EL</span> <span class="amp">PAJARO</span> <span class="pr">HOST</span></h1>
+  <div class="connections">
+    <button class="btn-twitch btn-cuba" id="btn-conn-cuba">
+      <span class="status-dot" id="dot-cuba"></span>
+      <span id="label-cuba">CONECTAR CUBA</span>
+    </button>
+    <button class="btn-twitch btn-pr" id="btn-conn-pr">
+      <span class="status-dot" id="dot-pr"></span>
+      <span id="label-pr">CONECTAR PR</span>
+    </button>
+  </div>
+</header>
+
+<!-- ========== Login (visible cuando no hay token) ========== -->
+<section id="login-screen" class="login-screen">
+  <div class="login-card">
+    <h2>ENTRAR AL PANEL</h2>
+    <p>Ingresá el PIN del host (variable <code>HOST_PIN</code> del <code>.env</code>).</p>
+    <form id="login-form">
+      <input type="password" id="pin" placeholder="PIN" autocomplete="off" />
+      <button type="submit" class="btn-primary">ENTRAR</button>
+    </form>
+    <p class="login-error" id="login-error"></p>
+  </div>
+</section>
+
+<!-- ========== Panel principal ========== -->
+<main id="main-panel" class="main-panel hidden">
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="setup">1 · Cantantes</button>
+    <button class="tab-btn" data-tab="pairings">2 · Emparejar</button>
+    <button class="tab-btn" data-tab="run">3 · Show en vivo</button>
+  </nav>
+
+  <!-- ========== Tab 1: Cantantes ========== -->
+  <section class="tab-panel active" data-panel="setup">
+    <div class="setup-actions">
+      <button id="btn-load-example" class="btn-ghost">Cargar 16 ejemplo</button>
+      <button id="btn-save-contestants" class="btn-primary">Guardar 16 cantantes</button>
+      <span class="contestants-count" id="contestants-count">0 / 16</span>
+    </div>
+    <div class="contestants-grid" id="contestants-grid"></div>
+  </section>
+
+  <!-- ========== Tab 2: Emparejamientos ========== -->
+  <section class="tab-panel" data-panel="pairings">
+    <p class="hint">Emparejá los 8 octofinales. Cada par DEBE ser <strong>1 cubano vs 1 puertorriqueño</strong>. 4 pares quedan sobre el ala izquierda y 4 sobre la derecha.</p>
+    <div class="pairings-controls">
+      <button id="btn-shuffle-pairings" class="btn-ghost">Sortear aleatorio</button>
+      <button id="btn-save-pairings" class="btn-primary">Guardar emparejamientos</button>
+      <button id="btn-build-bracket" class="btn-primary">Construir bracket</button>
+    </div>
+    <div class="pairings-list" id="pairings-list"></div>
+  </section>
+
+  <!-- ========== Tab 3: Run ========== -->
+  <section class="tab-panel" data-panel="run">
+    <div class="run-grid">
+      <div class="run-col">
+        <h3>BRACKET</h3>
+        <div class="run-bracket" id="run-bracket"></div>
+      </div>
+
+      <div class="run-col">
+        <h3>MATCH ACTIVO</h3>
+        <div class="active-match" id="active-match">
+          <p class="empty">Seleccioná un match en el bracket para empezar.</p>
+        </div>
+
+        <h3 style="margin-top:18px;">CONTROLES</h3>
+        <div class="controls">
+          <button id="ctl-preview" class="btn-action btn-blue" disabled>1. PREVIEW</button>
+          <div class="ctl-row">
+            <button id="ctl-clip-left"  class="btn-action btn-cuba"  disabled>▶ Clip izq</button>
+            <button id="ctl-clip-right" class="btn-action btn-pr"    disabled>▶ Clip der</button>
+            <button id="ctl-pause-clips" class="btn-action btn-ghost" disabled>⏸ Pausa</button>
+          </div>
+          <div class="ctl-row">
+            <label class="ctl-label">Duracion votacion (s):</label>
+            <input id="ctl-duration" type="number" min="10" max="300" value="60" />
+            <button id="ctl-vote-start" class="btn-action btn-yellow" disabled>2. ABRIR VOTACIÓN</button>
+            <button id="ctl-vote-end"   class="btn-action btn-ghost"  disabled>Cerrar votación</button>
+          </div>
+          <div class="ctl-row">
+            <button id="ctl-decide-left"  class="btn-action btn-cuba"   disabled>3. Gana IZQ</button>
+            <button id="ctl-decide-right" class="btn-action btn-pr"     disabled>3. Gana DER</button>
+          </div>
+        </div>
+
+        <h3 style="margin-top:18px;">RESULTADO EN VIVO</h3>
+        <div class="live-poll" id="live-poll">
+          <p class="empty">Sin votación activa.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="run-footer">
+      <button id="btn-reset" class="btn-danger">Resetear torneo (borra bracket y resultados)</button>
+      <button id="btn-logout" class="btn-ghost">Salir</button>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/host.js"></script>
+</body>
+</html>

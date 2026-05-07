@@ -1,0 +1,21 @@
+{
+  "name": "elpajaro",
+  "version": "0.1.0",
+  "description": "El Pajaro — show de votacion entre cantantes emergentes Cuba vs Puerto Rico, transmitido en Twitch dual-channel.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "multer": "^2.1.1",
+    "uuid": "^13.0.0",
+    "ws": "^8.18.3"
+  },
+  "license": "ISC"
+}
