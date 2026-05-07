@@ -301,13 +301,20 @@
       display: flex; align-items: center; justify-content: center;
     }
     .p1-card .thumb img {
-      width: 100%; height: 100%; object-fit: cover;
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
       display: block;
+      z-index: 2;        /* arriba del fallback gradient */
     }
     .p1-card .thumb img.failed { display: none; }
-    /* Fallback: gradient bonito + icono platform centrado, animacion sutil */
+    /* Fallback: gradient bonito + icono platform centrado, animacion sutil.
+       z-index 1: queda DEBAJO del img cuando carga ok. Solo se ve cuando
+       img tiene clase .failed (display:none) o no hay img. */
     .p1-card .thumb-fallback {
       position: absolute; inset: 0;
+      z-index: 1;
       display: flex; align-items: center; justify-content: center;
       flex-direction: column; gap: 6px;
       background-size: 220% 220%;
