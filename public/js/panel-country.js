@@ -288,24 +288,43 @@
       list.innerHTML = `<div style="text-align:center; padding:40px; color: var(--muted); font-style: italic;">— sin ${queueFilter} —</div>`;
       return;
     }
-    list.innerHTML = arr.map((s, i) => `
-      <div class="sub-item" data-id="${s.id}">
-        <div class="num">${i + 1}</div>
-        <div class="meta">
-          <div class="name">${escapeHtml(s.name)}</div>
-          <div class="ig">${s.instagram ? '@' + escapeHtml(s.instagram) : '—'} · ${escapeHtml(s.mediaType || 'link')}</div>
-          <a class="url" href="${escapeAttr(s.mediaUrl)}" target="_blank" rel="noopener">${escapeHtml(s.mediaUrl)}</a>
+    list.innerHTML = arr.map((s, i) => {
+      // Thumb: img si hay clipThumbnail, sino fallback con icono de plataforma.
+      // onload chequea que la img sea > 200px (sino es el placeholder feo de
+      // YouTube "video unavailable" 120x90, mejor mostrar fallback).
+      const platform = s.clipPlatform || 'link';
+      const platformIcon = platformIconFor(platform);
+      const imgTag = s.clipThumbnail
+        ? `<img src="${escapeAttr(s.clipThumbnail)}" alt="" loading="lazy"
+             onload="if(this.naturalWidth<200)this.classList.add('failed')"
+             onerror="this.classList.add('failed')" />`
+        : '';
+      return `
+        <div class="sub-item" data-id="${s.id}">
+          <div class="num">${i + 1}</div>
+          <div class="thumb">
+            <div class="thumb-fallback">
+              <span class="icon">${platformIcon}</span>
+              <span class="platform-name">${escapeHtml(platform)}</span>
+            </div>
+            ${imgTag}
+          </div>
+          <div class="meta">
+            <div class="name">${escapeHtml(s.name)}</div>
+            <div class="ig">${s.instagram ? '@' + escapeHtml(s.instagram) : '—'} · ${escapeHtml(s.mediaType || 'link')}</div>
+            <a class="url" href="${escapeAttr(s.mediaUrl)}" target="_blank" rel="noopener">${escapeHtml(s.mediaUrl)}</a>
+          </div>
+          <div class="actions">
+            ${s.status === 'pending'  ? `<button class="btn btn-success btn-sm" data-act="approve">✓ Aprobar</button>
+                                         <button class="btn btn-danger btn-sm"  data-act="reject">✗ Rechazar</button>` : ''}
+            ${s.status === 'approved' ? `<span class="badge badge-green">APROBADA</span>
+                                         <button class="btn btn-ghost btn-sm" data-act="reject">Rechazar</button>` : ''}
+            ${s.status === 'rejected' ? `<span class="badge badge-gray">RECHAZADA</span>
+                                         <button class="btn btn-ghost btn-sm" data-act="approve">Re-aprobar</button>` : ''}
+          </div>
         </div>
-        <div class="actions">
-          ${s.status === 'pending'  ? `<button class="btn btn-success btn-sm" data-act="approve">✓ Aprobar</button>
-                                       <button class="btn btn-danger btn-sm"  data-act="reject">✗ Rechazar</button>` : ''}
-          ${s.status === 'approved' ? `<span class="badge badge-green">APROBADA</span>
-                                       <button class="btn btn-ghost btn-sm" data-act="reject">Rechazar</button>` : ''}
-          ${s.status === 'rejected' ? `<span class="badge badge-gray">RECHAZADA</span>
-                                       <button class="btn btn-ghost btn-sm" data-act="approve">Re-aprobar</button>` : ''}
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
     list.querySelectorAll('.sub-item .actions button').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.closest('.sub-item').dataset.id;

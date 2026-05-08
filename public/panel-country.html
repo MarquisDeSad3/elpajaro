@@ -179,7 +179,7 @@
     .sub-list { display: grid; gap: 10px; }
     .sub-item {
       display: grid;
-      grid-template-columns: auto 1fr auto;
+      grid-template-columns: auto auto 1fr auto;
       gap: 14px; align-items: center;
       background: var(--glass-strong);
       border: 1px solid var(--glass-border);
@@ -188,6 +188,19 @@
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
     }
+    @media (max-width: 700px) {
+      .sub-item {
+        grid-template-columns: auto 1fr;
+        grid-template-areas:
+          "num     thumb"
+          "meta    meta"
+          "actions actions";
+      }
+      .sub-item .num     { grid-area: num; }
+      .sub-item .thumb   { grid-area: thumb; justify-self: end; }
+      .sub-item .meta    { grid-area: meta; }
+      .sub-item .actions { grid-area: actions; flex-wrap: wrap; }
+    }
     .sub-item .num {
       font-family: 'Archivo Black', sans-serif;
       width: 32px; height: 32px;
@@ -195,6 +208,36 @@
       background: var(--gold-grad); color: var(--ink);
       border-radius: 8px;
       font-size: .85rem;
+    }
+    /* Thumbnail del clip — preview visual antes de aprobar/rechazar.
+       Si no hay thumb (clipPlatform sin oEmbed valido), mostramos el
+       icono de la plataforma sobre un gradiente degradado. */
+    .sub-item .thumb {
+      position: relative;
+      width: 96px; height: 54px;
+      border-radius: 8px;
+      overflow: hidden;
+      flex-shrink: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,.05) 0%, rgba(0,0,0,.25) 100%);
+      border: 1px solid var(--glass-border);
+    }
+    .sub-item .thumb img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      z-index: 2;
+    }
+    .sub-item .thumb img.failed { display: none; }
+    .sub-item .thumb .thumb-fallback {
+      position: absolute; inset: 0; z-index: 1;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2px;
+      font-family: 'Archivo Black', sans-serif;
+      color: rgba(255,255,255,.5);
+    }
+    .sub-item .thumb .thumb-fallback .icon { font-size: 1.4rem; opacity: .8; }
+    .sub-item .thumb .thumb-fallback .platform-name {
+      font-size: .55rem; letter-spacing: 1.5px; text-transform: uppercase;
     }
     .sub-item .meta { min-width: 0; }
     .sub-item .meta .name {
