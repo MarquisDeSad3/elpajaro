@@ -500,8 +500,8 @@ app.post('/api/match/propose-decision', (req, res) => {
   if (!r) return res.status(400).json({ ok: false, error: 'No se pudo registrar el voto.' });
 
   if (r.consensus) {
-    // Ejecutar la decision
-    const out = bracketMod.decideMatch(stateMod.state.bracket, matchId, r.winnerSide);
+    // Ejecutar la decision (pasamos contestants para el re-pairing Cuba-vs-PR)
+    const out = bracketMod.decideMatch(stateMod.state.bracket, matchId, r.winnerSide, stateMod.state.contestants);
     if (!out.ok) {
       stateMod.clearPendingDecision();
       return res.status(400).json({ ok: false, error: out.error });
@@ -613,7 +613,7 @@ function autoDecideByChat(matchId) {
     winnerSide = Math.random() < 0.5 ? 'left' : 'right';
     console.log(`[MATCH] ${matchId} tie real ${totals.leftTotal}=${totals.rightTotal} → coin flip → ${winnerSide}`);
   }
-  const out = bracketMod.decideMatch(stateMod.state.bracket, matchId, winnerSide);
+  const out = bracketMod.decideMatch(stateMod.state.bracket, matchId, winnerSide, stateMod.state.contestants);
   if (!out.ok) {
     console.error('[MATCH] decideMatch failed:', out.error);
     return;
