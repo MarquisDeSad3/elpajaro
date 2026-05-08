@@ -410,8 +410,11 @@
         return;
       }
       const cap = stateSnapshot?.submissionsCap || 50;
-      const total = stateSnapshot?.countries?.[c]?.counts?.total || 0;
-      if (total >= cap) {
+      // 'active' = pending + approved (sin contar rejected). Si no viene
+      // del server (snapshot viejo), caemos a total como fallback.
+      const counts = stateSnapshot?.countries?.[c]?.counts || {};
+      const activeCount = (counts.active != null) ? counts.active : (counts.total || 0);
+      if (activeCount >= cap) {
         setError(1, `Las inscripciones de ${c === 'cuba' ? 'Cuba' : 'PR'} llegaron al cap (${cap}). Gracias.`);
         return;
       }
@@ -493,8 +496,12 @@
     stateSnapshot = d.state;
     const cuba = stateSnapshot.countries.cuba;
     const pr   = stateSnapshot.countries.pr;
-    const cubaOpen = cuba.submissionsOpen && cuba.counts.total < (stateSnapshot.submissionsCap || 50);
-    const prOpen   = pr.submissionsOpen   && pr.counts.total   < (stateSnapshot.submissionsCap || 50);
+    const cap  = stateSnapshot.submissionsCap || 50;
+    // 'active' (pending+approved) cuenta contra el cap; rejected NO ocupa slot
+    const cubaActive = (cuba.counts.active != null) ? cuba.counts.active : cuba.counts.total;
+    const prActive   = (pr.counts.active   != null) ? pr.counts.active   : pr.counts.total;
+    const cubaOpen = cuba.submissionsOpen && cubaActive < cap;
+    const prOpen   = pr.submissionsOpen   && prActive   < cap;
 
     if (!cubaOpen && !prOpen) {
       $('closedCard').classList.remove('hidden');

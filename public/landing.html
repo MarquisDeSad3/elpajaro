@@ -228,11 +228,13 @@
       $('show-active').classList.add('hidden');
     }
 
-    // Cuba stats
+    // Cuba stats. Mostramos 'active' (pending + approved) — las rejected
+    // no consumen slot, asi que tampoco las contamos en el contador publico.
     const cuba = state.countries.cuba;
-    $('cuba-count').textContent = cuba.counts.total;
+    const cubaShown = (cuba.counts.active != null) ? cuba.counts.active : cuba.counts.total;
+    $('cuba-count').textContent = cubaShown;
     $('cuba-cap-suffix').textContent = `/ ${cap}`;
-    $('cuba-progress').style.width = pct(cuba.counts.total) + '%';
+    $('cuba-progress').style.width = pct(cubaShown) + '%';
     $('cuba-open').innerHTML = fmtBool(cuba.submissionsOpen);
     $('cuba-team-status').innerHTML = cuba.teamLocked
       ? '<span class="badge badge-cuba">8 LISTOS</span>'
@@ -247,11 +249,12 @@
       $('cuba-team-list').innerHTML = '';
     }
 
-    // PR stats
+    // PR stats (mismo criterio que Cuba — mostrar active, no total)
     const pr = state.countries.pr;
-    $('pr-count').textContent = pr.counts.total;
+    const prShown = (pr.counts.active != null) ? pr.counts.active : pr.counts.total;
+    $('pr-count').textContent = prShown;
     $('pr-cap-suffix').textContent = `/ ${cap}`;
-    $('pr-progress').style.width = pct(pr.counts.total) + '%';
+    $('pr-progress').style.width = pct(prShown) + '%';
     $('pr-open').innerHTML = fmtBool(pr.submissionsOpen);
     $('pr-team-status').innerHTML = pr.teamLocked
       ? '<span class="badge badge-pr">8 LISTOS</span>'
