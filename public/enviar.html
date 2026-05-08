@@ -46,27 +46,108 @@
 
     /* Step 1 — country picker (big touch targets) */
     .country-pick {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+      padding: 8px 4px 16px;
     }
     .country-btn {
-      padding: 24px 12px;
+      position: relative;
+      padding: 28px 12px;
       border: 5px solid var(--ink);
       border-radius: 14px;
       cursor: pointer;
       font-family: 'Bangers', cursive;
       font-size: 1.6rem; letter-spacing: 2px;
       box-shadow: var(--shadow-sm);
-      transition: transform .12s, box-shadow .12s;
+      transition: transform .25s cubic-bezier(.34, 1.56, .64, 1),
+                  box-shadow .25s ease,
+                  opacity .25s ease,
+                  filter .25s ease,
+                  border-color .25s ease;
       color: white;
+      overflow: visible;
     }
     .country-btn.cuba { background: var(--cuba); }
     .country-btn.pr   { background: var(--pr); }
     .country-btn:hover { transform: translate(-2px,-2px); box-shadow: 5px 5px 0 var(--ink); }
     .country-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
-    .country-btn.selected {
-      outline: 4px solid var(--accent-yellow);
-      outline-offset: 2px;
+
+    /* Cuando hay UNO seleccionado, el OTRO se apaga visualmente para
+       que no haya duda de cual elegiste. */
+    .country-pick.has-selected .country-btn:not(.selected) {
+      opacity: .35;
+      transform: scale(.92);
+      filter: saturate(.4) brightness(.7);
     }
+
+    /* Botón seleccionado: salta hacia arriba con glow dorado + ring + check */
+    .country-btn.selected {
+      border-color: var(--accent-yellow);
+      border-width: 6px;
+      transform: scale(1.08) translate(-2px, -3px);
+      box-shadow:
+        0 0 0 4px var(--accent-yellow),
+        0 0 32px rgba(255, 216, 74, .85),
+        8px 10px 0 var(--ink),
+        0 14px 40px rgba(255, 216, 74, .4);
+      animation: countryPick .6s cubic-bezier(.34, 1.56, .64, 1);
+      z-index: 2;
+    }
+    @keyframes countryPick {
+      0%   { transform: scale(1) translate(0, 0); }
+      40%  { transform: scale(1.18) translate(-3px, -7px); }
+      70%  { transform: scale(1.04) translate(-1px, -2px); }
+      100% { transform: scale(1.08) translate(-2px, -3px); }
+    }
+
+    /* Check mark amarillo en la esquina superior derecha */
+    .country-btn.selected::before {
+      content: '✓';
+      position: absolute;
+      top: -14px; right: -14px;
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      background: var(--accent-yellow);
+      color: var(--ink);
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 1.5rem;
+      display: flex; align-items: center; justify-content: center;
+      border: 4px solid var(--ink);
+      box-shadow: 0 4px 14px rgba(255, 216, 74, .7);
+      animation: checkPop .55s cubic-bezier(.34, 1.56, .64, 1) backwards;
+      animation-delay: .15s;
+      z-index: 3;
+    }
+    @keyframes checkPop {
+      0%   { opacity: 0; transform: scale(0) rotate(-180deg); }
+      60%  { transform: scale(1.25) rotate(15deg); }
+      100% { opacity: 1; transform: scale(1) rotate(0); }
+    }
+
+    /* Ring que se expande hacia afuera al elegir (efecto "ping") */
+    .country-btn.selected::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: inherit;
+      border: 4px solid var(--accent-yellow);
+      animation: ringExpand .9s ease-out backwards;
+      pointer-events: none;
+    }
+    @keyframes ringExpand {
+      0%   { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.35); border-width: 1px; }
+    }
+
+    /* Cuando se habilita SIGUIENTE → pulso suave para que el usuario
+       sepa que el siguiente paso ya esta disponible. */
+    #btn-next-1:not(:disabled) {
+      animation: nextReady 1.6s ease-in-out infinite;
+    }
+    @keyframes nextReady {
+      0%, 100% { transform: scale(1); }
+      50%      { transform: scale(1.03); box-shadow: 0 0 22px rgba(255,216,74,.5); }
+    }
+
     .country-btn .flag {
       display: block; font-size: 2.2rem; margin-bottom: 6px;
     }
@@ -335,7 +416,15 @@
         return;
       }
       data.country = c;
-      document.querySelectorAll('.country-btn').forEach(b => b.classList.toggle('selected', b === btn));
+      // Reset animacion: quitar selected en TODOS antes de re-aplicar.
+      // Sin esto, re-clickear el mismo boton no re-dispara la animacion CSS.
+      const buttons = document.querySelectorAll('.country-btn');
+      buttons.forEach(b => b.classList.remove('selected'));
+      // Force reflow para que el browser reinicie la animacion al re-agregar.
+      void btn.offsetWidth;
+      btn.classList.add('selected');
+      // Marcar el container para apagar visualmente el otro boton
+      document.querySelector('.country-pick').classList.add('has-selected');
       $('btn-next-1').disabled = false;
       setError(1, '');
     });
